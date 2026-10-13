@@ -221,6 +221,17 @@ body{background:radial-gradient(90% 45% at 50% -12%,rgba(184,242,107,.07),rgba(1
 .confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}
 .fin .emoji{display:inline-block;animation:pop .7s cubic-bezier(.2,.9,.3,1.4) both}
 @media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+.plan{display:grid;gap:4px;margin-top:18px}
+.ps{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;font-size:11.5px;line-height:1.25;color:var(--mu);position:relative;min-width:0}
+.ps span{overflow-wrap:anywhere}
+.ps i{width:38px;height:38px;border-radius:50%;background:var(--s2);display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:800;font-size:15px;color:var(--mu);position:relative;z-index:1}
+.ps.dn i{background:var(--ac);color:#0a0a0b}
+.ps.nx i{box-shadow:inset 0 0 0 1.5px var(--ac);color:var(--ac)}
+.ps.nx{color:var(--tx);font-weight:600}
+.ps:not(:last-child):after{content:"";position:absolute;top:18px;left:calc(50% + 23px);right:calc(-50% + 23px);height:2px;border-radius:2px;background:var(--s3)}
+.ps.dn:not(:last-child):after{background:var(--acm)}
+#app.enter .ps i{animation:pop .5s cubic-bezier(.2,.9,.3,1.3) both}
+#app.enter .ps:nth-child(1) i{animation-delay:.2s}#app.enter .ps:nth-child(2) i{animation-delay:.28s}#app.enter .ps:nth-child(3) i{animation-delay:.36s}#app.enter .ps:nth-child(4) i{animation-delay:.44s}#app.enter .ps:nth-child(n+5) i{animation-delay:.5s}
 </style>
 </head>
 <body>
@@ -239,7 +250,7 @@ body{background:radial-gradient(90% 45% at 50% -12%,rgba(184,242,107,.07),rgba(1
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '4.0';
+const KEY = 'entreno.v1', VERSION = '4.1';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -287,7 +298,7 @@ function seed() {
   });
   return {
     version: 1,
-    settings: { unit: 'kg', rest: 120, step: 2.5, bar: 20, lastBackup: 0 },
+    settings: { name: 'Facu', unit: 'kg', rest: 120, step: 2.5, bar: 20, lastBackup: 0 },
     exercises,
     routines: [],
     sessions: [],
@@ -295,59 +306,52 @@ function seed() {
   };
 }
 // Tus 4 rutinas, tomadas de la planilla "Rutina Gym"
-const SHEET_VERSION = 1;
+const SHEET_VERSION = 2;
 const SHEET = [
-  ['Torso A', 'Compuestos', [1], [
-    ['Press inclinado con barra', 'Pecho'],
-    ['Remo en T', 'Espalda', { w: 20 }],
-    ['Press militar con barra', 'Hombro'],
-    ['Dominadas', 'Espalda', { note: 'En tu planilla: 10 o 14 kg' }],
-    ['Curl bayesian en polea', 'Bíceps', { w: 7, uni: 1 }],
-    ['Extensión de tríceps en polea', 'Tríceps']]],
-  ['Pierna · cuádriceps', 'Cuádriceps', [2], [
-    ['Sentadilla hack', 'Cuádriceps', { note: 'O prensa si está ocupada' }],
-    ['Estocadas en Smith', 'Glúteo', { w: 15, uni: 1 }],
-    ['Curl femoral sentado', 'Femoral', { w: 8, note: 'En tu planilla: 8 c/l' }],
-    ['Camilla de cuádriceps', 'Cuádriceps', { w: 36 }],
-    ['Abducción en máquina', 'Glúteo', { note: 'Abductores (hacia afuera)' }],
-    ['Elevación de talones unilateral con mancuerna', 'Gemelos', { uni: 1 }]]],
-  ['Torso B', 'Accesorios', [4], [
-    ['Fondos en paralelas', 'Pecho'],
-    ['Jalón agarre cerrado', 'Espalda'],
-    ['Aperturas con mancuernas', 'Pecho'],
-    ['Elevaciones laterales en polea', 'Hombro'],
-    ['Face pull', 'Hombro'],
-    ['Curl martillo en banco Scott', 'Bíceps', { note: 'En tu planilla: 7 o 6 kg' }]]],
-  ['Pierna · posterior', 'Posterior', [5], [
-    ['Peso muerto rumano', 'Femoral', { note: 'Ejercicio nuevo' }],
-    ['Hip thrust', 'Glúteo', { w: 15 }],
-    ['Sentadilla búlgara', 'Cuádriceps', { w: 8, note: '8 kg por lado' }],
-    ['Curl femoral acostado', 'Femoral', { w: 36 }],
-    ['Aducción en máquina', 'Aductores', { note: 'Aductores (hacia adentro)' }],
-    ['Elevación de talones sentado', 'Gemelos']]],
+  ['Torso A', 'Compuestos', [
+    ['Press inclinado con barra', 'Pecho'], ['Remo en T', 'Espalda'], ['Press militar con barra', 'Hombro'],
+    ['Dominadas', 'Espalda'], ['Curl bayesian en polea', 'Bíceps', { uni: 1 }], ['Extensión de tríceps en polea', 'Tríceps']]],
+  ['Pierna · cuádriceps', 'Cuádriceps', [
+    ['Sentadilla hack', 'Cuádriceps', { note: 'O prensa si está ocupada' }], ['Estocadas en Smith', 'Glúteo', { uni: 1 }],
+    ['Curl femoral sentado', 'Femoral'], ['Camilla de cuádriceps', 'Cuádriceps'],
+    ['Abducción en máquina', 'Glúteo', { note: 'Abductores (hacia afuera)' }], ['Elevación de talones unilateral con mancuerna', 'Gemelos', { uni: 1 }]]],
+  ['Torso B', 'Accesorios', [
+    ['Fondos en paralelas', 'Pecho'], ['Jalón agarre cerrado', 'Espalda'], ['Aperturas con mancuernas', 'Pecho'],
+    ['Elevaciones laterales en polea', 'Hombro'], ['Face pull', 'Hombro'], ['Curl martillo en banco Scott', 'Bíceps']]],
+  ['Pierna · posterior', 'Posterior', [
+    ['Peso muerto rumano', 'Femoral', { note: 'Ejercicio nuevo' }], ['Hip thrust', 'Glúteo'], ['Sentadilla búlgara', 'Cuádriceps'],
+    ['Curl femoral acostado', 'Femoral'], ['Aducción en máquina', 'Aductores', { note: 'Aductores (hacia adentro)' }], ['Elevación de talones sentado', 'Gemelos']]],
 ];
 function importSheet(d) {
-  if ((d.sheetV || 0) >= SHEET_VERSION) return d;
-  const findEx = (name, muscle, uni) => {
-    let e = d.exercises.find(x => norm(x.name) === norm(name));
-    if (!e) { e = { id: uid(), name, muscle, unilateral: !!uni, custom: true }; d.exercises.push(e); }
-    return e.id;
-  };
-  // Las rutinas de ejemplo de antes se archivan (se pueden restaurar)
-  d.routines.forEach(r => { if (['Push', 'Pull', 'Pierna A', 'Pierna B'].includes(r.name)) r.archived = true; });
-  SHEET.forEach(([name, desc, days, items]) => {
-    if (d.routines.some(r => r.name === name && !r.archived)) return;
-    d.routines.push({ id: uid(), name, desc, days, archived: false, items: items.map(([n, m, o = {}]) => {
-      const it = { id: uid(), exerciseId: findEx(n, m, o.uni), sets: 3, repMin: 8, repMax: 10, rest: 120, notes: o.note || '' };
-      if (o.w != null) it.startW = o.w;
-      return it;
-    }) });
+  const v = d.sheetV || 0;
+  if (v >= SHEET_VERSION) return d;
+  if (v < 1) {
+    const findEx = (name, muscle, uni) => {
+      let e = d.exercises.find(x => norm(x.name) === norm(name));
+      if (!e) { e = { id: uid(), name, muscle, unilateral: !!uni, custom: true }; d.exercises.push(e); }
+      return e.id;
+    };
+    d.routines.forEach(r => { if (['Push', 'Pull', 'Pierna A', 'Pierna B'].includes(r.name)) r.archived = true; });
+    SHEET.forEach(([name, desc, items]) => {
+      if (d.routines.some(r => r.name === name && !r.archived)) return;
+      d.routines.push({ id: uid(), name, desc, days: [], archived: false, items: items.map(([n, m, o = {}]) =>
+        ({ id: uid(), exerciseId: findEx(n, m, o.uni), sets: 3, repMin: 8, repMax: 10, rest: 120, notes: o.note || '' })) });
+    });
+    // Las rutinas de tu plan van primero, en el orden de la planilla
+    const names = SHEET.map(x => x[0]);
+    d.routines.sort((a, b) => (names.includes(a.name) ? names.indexOf(a.name) : 99) - (names.includes(b.name) ? names.indexOf(b.name) : 99));
+  }
+  // v2: sin pesos de la planilla y sin días fijos
+  d.routines.forEach(r => {
+    r.days = [];
+    r.items.forEach(it => { delete it.startW; if (/^En tu planilla|^8 kg por lado$/.test(it.notes || '')) it.notes = ''; });
   });
   d.sheetV = SHEET_VERSION;
   return d;
 }
+
 function migrate(d) {
-  d.settings = Object.assign({ unit: 'kg', rest: 120, step: 2.5, bar: 20, lastBackup: 0 }, d.settings || {});
+  d.settings = Object.assign({ name: 'Facu', unit: 'kg', rest: 120, step: 2.5, bar: 20, lastBackup: 0 }, d.settings || {});
   d.exercises = d.exercises || []; d.routines = d.routines || []; d.sessions = d.sessions || [];
   d.active = d.active || null; d.version = 1;
   return d;
@@ -417,7 +421,8 @@ const fmtVol = v => Math.round(v).toLocaleString('es-UY') + ' ' + unit();
 const repsTxt = (a, b) => a === b ? a : `${a}–${b}`;
 const daysLabel = days => DAY_ORDER.filter(k => days.includes(k)).map(k => DAYN[k]).join(' · ');
 const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-function greet() { const h = new Date().getHours(); return h < 6 ? 'Buenas noches' : h < 12 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches'; }
+const uname = () => (S.settings.name || '').trim();
+function greet() { const h = new Date().getHours(), n = uname(); return (h < 6 ? 'Buenas noches' : h < 12 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches') + (n ? ', ' + esc(n) : ''); }
 function weekStart(ts = Date.now()) { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); }
 function addDays(ts, n) { const d = new Date(ts); d.setDate(d.getDate() + n); return d.getTime(); }
 const dayKey = ts => new Date(ts).toDateString();
@@ -509,7 +514,15 @@ function render() {
 }
 
 /* ---------- Inicio ---------- */
-function weeklyGoal() { return Math.max(1, S.routines.filter(r => !r.archived).reduce((a, r) => a + r.days.length, 0)); }
+function plan() {
+  const act = S.routines.filter(r => !r.archived), ws = weekStart();
+  const wk = S.sessions.filter(s => s.start >= ws);
+  const done = new Set(wk.map(s => s.routineId).filter(Boolean));
+  const next = act.find(r => !done.has(r.id)) || null;
+  const today = S.sessions.filter(s => dayKey(s.start) === dayKey(Date.now()));
+  return { act, wk, done, next, today, count: act.filter(r => done.has(r.id)).length };
+}
+function weeklyGoal() { return Math.max(1, S.routines.filter(r => !r.archived).length); }
 function calcStreak(goal) {
   const count = ws => { const we = addDays(ws, 7); return S.sessions.filter(s => s.start >= ws && s.start < we).length; };
   let ws = weekStart(), n = 0;
@@ -538,37 +551,45 @@ function heatmap() {
   return `<div class="hm"><div class="hm-m">${months}</div><div class="hm-g">${cells}</div></div>`;
 }
 function vHome() {
-  const act = S.routines.filter(r => !r.archived), today = new Date().getDay();
-  const todayR = act.find(r => r.days.includes(today));
-  const ws = weekStart(), wkSess = S.sessions.filter(s => s.start >= ws);
-  const goal = weeklyGoal(), streak = calcStreak(goal);
+  const P = plan(), goal = weeklyGoal(), streak = calcStreak(goal);
   let h = `<div class="kicker">${cap(fmtDate(Date.now()))}</div><h1>${greet()}</h1>`;
-
+  const chips = r => `<div class="mchips">${routineMuscles(r).map(m => `<span class="mchip">${esc(m)}</span>`).join('')}</div>`;
+  const other = `<button class="big" style="margin-top:8px;background:rgba(255,255,255,.07)" data-a="chooseRoutine">Elegir otra rutina</button>`;
   if (S.active) {
     const a = S.active, T = wkTotals(a);
     h += `<div class="today"><div class="kicker" style="color:var(--ac)">En curso</div><div class="n">${esc(a.name)}</div>
       <div class="mu">${T.dn} de ${T.tot} series · empezado a las ${fmtTime(a.start)}</div><button class="pri big cta" style="margin-top:18px" data-a="resume">Continuar</button></div>`;
-  } else if (todayR) {
-    const ms = routineMuscles(todayR);
-    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Entrenamiento de hoy</div><div class="n">${esc(todayR.name)}</div>
-      <div class="mu">${todayR.items.length} ejercicios · ~${routineMin(todayR)} min</div>
-      <div class="mchips">${ms.map(m => `<span class="mchip">${esc(m)}</span>`).join('')}</div>
-      <button class="pri big cta" style="margin:0" data-a="start" data-id="${todayR.id}">Empezar</button></div>`;
+  } else if (!P.act.length) {
+    h += `<div class="today"><div class="kicker">Tu plan</div><div class="n">Sin rutinas</div><div class="mu">Creá tu primera rutina para empezar.</div>
+      <button class="pri big cta" style="margin-top:18px" data-a="tab" data-v="train">Ir a Entrenar</button></div>`;
+  } else if (P.today.length) {
+    const t = P.today[P.today.length - 1];
+    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Hoy · ¡ya entrenaste! ✓</div><div class="n">${esc(t.name)}</div>
+      <div class="mu">${fmtDur(t.end - t.start)} · ${sessSets(t)} series · ${fmtVol(sessVol(t))}</div>
+      ${P.next ? `<div class="mu sm" style="margin-top:14px">Próxima en tu plan: <b style="color:var(--tx)">${esc(P.next.name)}</b></div>` : ''}
+      <button class="big" style="margin-top:16px;background:rgba(255,255,255,.07)" data-a="chooseRoutine">Entrenar de nuevo</button></div>`;
+  } else if (P.next) {
+    const r = P.next;
+    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Tu próximo entrenamiento · ${P.count + 1} de ${P.act.length}</div><div class="n">${esc(r.name)}</div>
+      <div class="mu">${r.items.length} ejercicios · ~${routineMin(r)} min</div>${chips(r)}
+      <button class="pri big cta" style="margin:0" data-a="start" data-id="${r.id}">Empezar</button>${other}</div>`;
   } else {
-    h += `<div class="today"><div class="kicker">Hoy</div><div class="n">Día de descanso</div>
-      <div class="mu">No tenés una rutina asignada para hoy.</div><button class="big" style="margin-top:18px;background:rgba(255,255,255,.07)" data-a="tab" data-v="train">Entrenar igual</button></div>`;
+    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Semana completa 🔥</div><div class="n">¡Cumpliste tu plan!</div>
+      <div class="mu">Hiciste las ${P.act.length} rutinas. El lunes arranca de nuevo con ${esc(P.act[0].name)}.</div>
+      <button class="big" style="margin-top:18px;background:rgba(255,255,255,.07)" data-a="chooseRoutine">Entrenar igual</button></div>`;
   }
 
-  let strip = '';
-  DAY_ORDER.forEach((k, n) => {
-    const day = addDays(ws, n), dn = wkSess.some(s => dayKey(s.start) === dayKey(day)), pl = act.some(r => r.days.includes(k));
-    strip += `<div class="wd ${dn ? 'dn' : ''} ${pl ? 'pl' : ''} ${k === today ? 'td' : ''}"><i>${dn ? '✓' : ''}</i>${'DLMXJVS'[k]}</div>`;
-  });
-  h += `<h2>Esta semana</h2><div class="card"><div class="row"><div class="sp"><span class="t">${wkSess.length} de ${goal}</span> <span class="mu">entrenamientos</span></div>
-    ${streak ? `<span class="badge ac">🔥 ${streak} ${streak === 1 ? 'semana' : 'semanas'}</span>` : ''}</div><div class="week">${strip}</div></div>`;
+  if (P.act.length) {
+    const steps = P.act.map((r, k) => {
+      const dn = P.done.has(r.id), nx = P.next && P.next.id === r.id;
+      return `<div class="ps ${dn ? 'dn' : ''} ${nx ? 'nx' : ''}"><i>${dn ? '✓' : k + 1}</i><span>${esc(r.name)}</span></div>`;
+    }).join('');
+    h += `<h2>Tu semana</h2><div class="card"><div class="row"><div class="sp"><span class="t">${P.count} de ${P.act.length}</span> <span class="mu">rutinas</span></div>
+      ${streak ? `<span class="badge ac">🔥 ${streak} ${streak === 1 ? 'semana' : 'semanas'}</span>` : ''}</div>
+      <div class="plan" style="grid-template-columns:repeat(${P.act.length},1fr)">${steps}</div></div>`;
+  }
 
   h += `<h2>Constancia</h2><div class="card"><div class="bigstat"><span class="grad" data-count="${S.sessions.length}">${S.sessions.length}</span></div><div class="mu sm" style="margin-top:4px">entrenamientos completados</div>${heatmap()}</div>`;
-
   if (S.sessions.length) {
     const last = S.sessions[S.sessions.length - 1];
     h += `<div class="row" style="margin:32px 0 12px"><h2 class="sp" style="margin:0">Último entrenamiento</h2><button class="link" data-a="tab" data-v="history">Ver todo</button></div>` + sessCard(last);
@@ -587,21 +608,22 @@ function sessCard(s) {
 
 /* ---------- Entrenar ---------- */
 function vTrain() {
-  const today = new Date().getDay();
-  const act = S.routines.filter(r => !r.archived), arc = S.routines.filter(r => r.archived);
-  let h = `<div class="row" style="margin-bottom:20px"><h1 class="sp" style="margin:0">Entrenar</h1><button class="sm" data-a="newRoutine">+ Rutina</button></div>`;
+  const P = plan(), arc = S.routines.filter(r => r.archived);
+  let h = `<div class="row" style="margin-bottom:8px"><h1 class="sp" style="margin:0">Entrenar</h1><button class="sm" data-a="newRoutine">+ Rutina</button></div>
+    <p class="mu sm" style="margin:0 0 18px">Tu plan semanal, en orden. Cada lunes vuelve a empezar.</p>`;
   if (S.active) h += `<div class="card hl row"><div class="sp"><div class="kicker" style="color:var(--ac)">En curso</div><div class="t">${esc(S.active.name)}</div></div><button class="pri" data-a="resume">Continuar</button></div>`;
-  if (!act.length) h += `<div class="card mu">Todavía no tenés rutinas. Creá una con “+ Rutina”.</div>`;
-  act.forEach(r => {
-    const isToday = r.days.includes(today), ms = routineMuscles(r);
-    h += `<div class="card ${isToday ? 'hl' : ''}"><div class="row" style="align-items:flex-start">
-      <div class="sp clickable" data-a="routineMenu" data-id="${r.id}"><div class="row" style="gap:8px"><span class="t" style="font-size:19px">${esc(r.name)}</span>${isToday ? '<span class="badge ac">Hoy</span>' : ''}</div>
-      <div class="mu sm" style="margin-top:2px">${r.items.length} ejercicios · ~${routineMin(r)} min${r.days.length ? ' · ' + daysLabel(r.days) : ''}</div>
+  if (!P.act.length) h += `<div class="card mu">Todavía no tenés rutinas. Creá una con “+ Rutina”.</div>`;
+  P.act.forEach((r, k) => {
+    const dn = P.done.has(r.id), nx = P.next && P.next.id === r.id, ms = routineMuscles(r);
+    h += `<div class="card ${nx ? 'hl' : ''}"><div class="row" style="align-items:flex-start">
+      <div class="sp clickable" data-a="routineMenu" data-id="${r.id}"><div class="row" style="gap:8px"><span class="mu sm" style="font-weight:700">${k + 1}</span><span class="t" style="font-size:19px">${esc(r.name)}</span>
+      ${nx ? '<span class="badge ac">Siguiente</span>' : dn ? '<span class="badge">✓ Esta semana</span>' : ''}</div>
+      <div class="mu sm" style="margin-top:2px">${r.items.length} ejercicios · ~${routineMin(r)} min</div>
       ${ms.length ? `<div class="mu sm" style="margin-top:8px">${esc(ms.join(', '))}</div>` : ''}</div>
-      <button class="${isToday ? 'pri' : ''}" data-a="start" data-id="${r.id}">Empezar</button></div></div>`;
+      <button class="${nx ? 'pri' : ''}" data-a="start" data-id="${r.id}">Empezar</button></div></div>`;
   });
   h += `<button class="big" style="background:var(--s1)" data-a="startFree">Sesión libre</button>`;
-  if (act.length) h += `<p class="mu sm c" style="margin-top:14px">Tocá una rutina para editarla, duplicarla, ordenarla o archivarla.</p>`;
+  if (P.act.length) h += `<p class="mu sm c" style="margin-top:14px">Tocá una rutina para editarla, duplicarla, cambiarla de lugar en el plan o archivarla.</p>`;
   if (arc.length) {
     h += `<h2>Archivadas</h2>`;
     arc.forEach(r => h += `<div class="card row"><div class="sp"><div class="t mu">${esc(r.name)}</div><div class="mu sm">${r.items.length} ejercicios</div></div>
@@ -614,7 +636,6 @@ function vEdit() {
   let h = `<div class="head"><button class="ghost" data-a="cancelEdit">Cancelar</button><div class="sp t c">${d._new ? 'Nueva rutina' : 'Editar rutina'}</div><button class="pri" data-a="saveEdit">Guardar</button></div>
   <label class="f"><span>Nombre</span><input data-f="dname" value="${esc(d.name)}" placeholder="Ej: Push"></label>
   <label class="f"><span>Descripción (opcional)</span><textarea data-f="ddesc">${esc(d.desc)}</textarea></label>
-  <div class="f"><span>Días en que la hacés</span><div class="chips">${DAY_ORDER.map(k => `<button class="chip ${d.days.includes(k) ? 'on' : ''}" data-a="toggleDay" data-k="${k}">${DAYN[k]}</button>`).join('')}</div></div>
   <h2>Ejercicios · en este orden te va a guiar</h2>`;
   if (!d.items.length) h += `<div class="card mu">Sin ejercicios todavía.</div>`;
   d.items.forEach((it, i) => {
@@ -899,7 +920,7 @@ function vSession() {
   const dv = prev ? pct(sessVol(s), sessVol(prev)) : 0;
   let h = `<div class="head"><button class="ghost" data-a="${isFresh ? 'tab' : 'back'}" data-v="home">${isFresh ? 'Cerrar' : '‹ Volver'}</button><span class="sp"></span>
     <button class="${editHist ? 'pri' : ''}" style="${editHist ? '' : 'background:var(--s1)'}" data-a="toggleEditHist">${editHist ? 'Listo' : 'Corregir'}</button></div>`;
-  if (isFresh) h += `<div class="fin" style="padding-top:6px"><div class="emoji">🎉</div><div class="exname">¡Buen entrenamiento!</div><div class="mu">${esc(s.name)}</div></div>`;
+  if (isFresh) h += `<div class="fin" style="padding-top:6px"><div class="emoji">🎉</div><div class="exname">¡Buen entrenamiento${uname() ? ', ' + esc(uname()) : ''}!</div><div class="mu">${esc(s.name)}</div></div>`;
   h += `<div class="kicker" style="${isFresh ? 'text-align:center;margin-top:10px' : ''}">${cap(fmtDate(s.start))} · ${fmtTime(s.start)}</div>
     ${isFresh ? '' : `<h1 style="margin-top:6px">${esc(s.name)}</h1>`}
     <div class="tiles" style="margin-top:16px"><div class="tile"><b>${fmtDur(s.end - s.start)}</b><span>Duración</span></div>
@@ -930,6 +951,7 @@ function vSession() {
 function vSettings() {
   const lb = S.settings.lastBackup;
   return `<h1>Ajustes</h1>
+  <h2>Perfil</h2><div class="card"><label class="f" style="margin:0"><span>Tu nombre (para saludarte)</span><input data-f="uname" value="${esc(S.settings.name || '')}" placeholder="Tu nombre" autocomplete="given-name"></label></div>
   <h2>Entrenamiento</h2><div class="card">
     <label class="f" style="margin-top:0"><span>Unidad de peso (solo cambia la etiqueta)</span><select data-f="unit">
       <option value="kg" ${unit() === 'kg' ? 'selected' : ''}>Kilos (kg)</option><option value="lb" ${unit() === 'lb' ? 'selected' : ''}>Libras (lb)</option></select></label>
@@ -1030,13 +1052,23 @@ const A = {
     if (S.active) { toast('Ya hay un entrenamiento en curso'); go('workout'); return; }
     startSession(S.routines.find(r => r.id === d.id));
   },
-  startFree: () => { if (S.active) { toast('Ya hay un entrenamiento en curso'); go('workout'); return; } startSession(null); },
+  startFree: () => { closeModal(); if (S.active) { toast('Ya hay un entrenamiento en curso'); go('workout'); return; } startSession(null); },
   openSession: d => { closeModal(); go('session', d.id); },
   openEx: d => { closeModal(); go('exercise', d.id); },
   closeModal: () => closeModal(),
   confirmOk: () => { const cb = confirmCb; confirmCb = null; closeModal(); cb && cb(); },
 
   // rutinas
+  chooseRoutine: () => {
+    const P = plan();
+    openModal(`<div class="row"><div class="t sp" style="font-size:19px">¿Qué entrenás hoy?</div><button class="ghost" data-a="closeModal">Cerrar</button></div>
+      ${P.act.map((r, k) => {
+        const dn = P.done.has(r.id), nx = P.next && P.next.id === r.id;
+        return `<button class="pick" data-a="start" data-id="${r.id}"><span class="mu" style="width:20px">${k + 1}</span><span class="sp" style="${nx ? 'font-weight:700' : ''}">${esc(r.name)}</span>
+          <span class="sm ${nx ? 'up' : 'mu'}">${nx ? 'Siguiente' : dn ? '✓ Hecha' : ''}</span></button>`;
+      }).join('')}
+      <button class="big" data-a="startFree">Sesión libre</button>`);
+  },
   routineMenu: d => {
     const act = S.routines.filter(r => !r.archived), i = act.findIndex(r => r.id === d.id), r = act[i];
     openModal(`<div class="t" style="font-size:19px">${esc(r.name)}</div>
@@ -1245,6 +1277,7 @@ function onField(e) {
   else if (f === 'it') draft.items[+d.i][d.k] = (d.k === 'notes' || d.k === 'startW') ? v : (d.k === 'rest' ? +v : v);
   else if (f === 'pq') { pickQ = v; $('#plist').innerHTML = pickerList(); }
   else if (f === 'hs') { const s = S.sessions.find(x => x.id === R.id); const n = num(v); if (Number.isFinite(n) && n >= 0) { s.exercises[+d.i].sets[+d.j][d.k] = d.k === 'r' ? Math.round(n) : n; save(); } }
+  else if (f === 'uname') { S.settings.name = v.trim(); save(); }
   else if (f === 'unit') { S.settings.unit = v; save(); }
   else if (f === 'step') { S.settings.step = +v; save(); }
   else if (f === 'bar') { S.settings.bar = +v; save(); }
