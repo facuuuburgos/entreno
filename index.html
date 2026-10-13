@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-192.png">
 <title>Entreno</title>
 <style>
-:root{--bg:#0a0a0b;--s1:#131316;--s2:#1b1b20;--s3:#26262d;--ln:rgba(255,255,255,.07);--tx:#f4f4f6;--mu:#8a8a94;--mu2:#5c5c66;--ac:#b8f26b;--acd:rgba(184,242,107,.1);--acm:rgba(184,242,107,.3);--gold:#f5c451;--dn:#ff6b6b;--r:20px}
+:root{color-scheme:dark;--bg:#0a0a0b;--s1:#131316;--s2:#1b1b20;--s3:#26262d;--ln:rgba(255,255,255,.07);--tx:#f4f4f6;--mu:#8a8a94;--mu2:#5c5c66;--ac:#b8f26b;--acd:rgba(184,242,107,.1);--acm:rgba(184,242,107,.3);--gold:#f5c451;--dn:#ff6b6b;--r:20px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 body{padding-top:env(safe-area-inset-top);min-height:100vh}
@@ -168,8 +168,8 @@ textarea{resize:vertical;min-height:56px}
 .pick{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border-bottom:1px solid var(--ln);border-radius:0;padding:14px 2px}
 .pick:active{transform:none}
 .grp{font-size:12px;color:var(--mu);text-transform:uppercase;letter-spacing:.1em;margin:18px 0 2px;font-weight:600}
-#toast{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top));transform:translateX(-50%) translateY(-300%);background:var(--tx);color:var(--bg);padding:11px 18px;border-radius:99px;font-size:14px;font-weight:650;z-index:30;transition:transform .3s cubic-bezier(.2,.9,.3,1.2);pointer-events:none;max-width:90vw;white-space:nowrap}
-#toast.show{transform:translateX(-50%) translateY(0)}
+#toast{position:fixed;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%) translateY(-24px) scale(.9);opacity:0;visibility:hidden;background:var(--tx);color:var(--bg);padding:11px 18px;border-radius:99px;font-size:14px;font-weight:650;z-index:30;transition:transform .35s cubic-bezier(.2,.9,.3,1.2),opacity .25s,visibility 0s .35s;pointer-events:none;max-width:90vw;white-space:nowrap}
+#toast.show{transform:translateX(-50%) translateY(0) scale(1);opacity:1;visibility:visible;transition:transform .35s cubic-bezier(.2,.9,.3,1.2),opacity .25s,visibility 0s}
 #toast.gold{background:var(--gold)}
 .slist div{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--ln);font-size:15px}
 .slist div:last-child{border-bottom:none}
@@ -250,7 +250,7 @@ body{background:radial-gradient(90% 45% at 50% -12%,rgba(184,242,107,.07),rgba(1
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '4.1';
+const KEY = 'entreno.v1', VERSION = '4.2';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -489,7 +489,7 @@ function confetti(n = 120) {
   })(t0);
 }
 function render() {
-  const views = { home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   if (R.view !== lastView) {
@@ -503,9 +503,9 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', edit: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', edit: 'train', log: 'history' };
   const tabView = tabOf[R.view] || R.view;
-  $('#tabs').style.display = (R.view === 'workout' || R.view === 'edit') ? 'none' : 'flex';
+  $('#tabs').style.display = (R.view === 'workout' || R.view === 'edit' || R.view === 'log') ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
   renderRest();
   keepAwake(R.view === 'workout');
@@ -622,7 +622,7 @@ function vTrain() {
       ${ms.length ? `<div class="mu sm" style="margin-top:8px">${esc(ms.join(', '))}</div>` : ''}</div>
       <button class="${nx ? 'pri' : ''}" data-a="start" data-id="${r.id}">Empezar</button></div></div>`;
   });
-  h += `<button class="big" style="background:var(--s1)" data-a="startFree">Sesión libre</button>`;
+  h += `<div class="row" style="gap:8px"><button class="big sp" style="background:var(--s1)" data-a="startFree">Sesión libre</button><button class="big sp" style="background:var(--s1)" data-a="logPast">Registrar uno pasado</button></div>`;
   if (P.act.length) h += `<p class="mu sm c" style="margin-top:14px">Tocá una rutina para editarla, duplicarla, cambiarla de lugar en el plan o archivarla.</p>`;
   if (arc.length) {
     h += `<h2>Archivadas</h2>`;
@@ -901,8 +901,33 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ---------- Historial ---------- */
+let logD = null;
+const ymd = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+function vLog() {
+  const L = logD;
+  if (!L) { R.view = 'history'; return vHistory(); }
+  let h = `<div class="head"><button class="ghost" data-a="logCancel">Cancelar</button><div class="sp t c">Registrar</div><button class="pri" data-a="logSave">Guardar</button></div>
+    <div class="kicker">${cap(fmtDate(L.start))} · ${fmtTime(L.start)} · ${fmtDur(L.end - L.start)}</div><h1 style="margin-top:6px">${esc(L.name)}</h1>
+    <p class="mu sm" style="margin-top:-8px">Anotá lo que hiciste. Las series sin repeticiones no se guardan. Si fue con tu peso corporal, dejá el peso vacío.</p>`;
+  if (!L.exercises.length) h += `<div class="card mu">Agregá los ejercicios que hiciste.</div>`;
+  L.exercises.forEach((e, i) => {
+    const last = lastFor(e.exerciseId, L.start);
+    h += `<div class="card"><div class="row"><div class="t sp">${esc(e.name)}${e.unilateral ? ' <span class="mu sm">(c/lado)</span>' : ''}</div><button class="sm ghost danger" data-a="logDelEx" data-i="${i}">Quitar</button></div>
+      <div class="hset mu sm" style="margin-top:10px"><span>#</span><span class="c">${unit()}</span><span class="c">Reps</span><span></span></div>`;
+    e.sets.forEach((x, j) => {
+      const ls = last && (last.sets[j] || last.sets[last.sets.length - 1]);
+      h += `<div class="hset"><span class="mu">${j + 1}</span>
+        <input inputmode="decimal" data-f="lg" data-k="w" data-i="${i}" data-j="${j}" value="${esc(x.w)}" placeholder="${ls ? esc(fmtNum(ls.w)) : '—'}">
+        <input inputmode="numeric" data-f="lg" data-k="r" data-i="${i}" data-j="${j}" value="${esc(x.r)}" placeholder="${ls ? ls.r : '—'}">
+        <button class="ghost danger" data-a="logDelSet" data-i="${i}" data-j="${j}" aria-label="Quitar serie">✕</button></div>`;
+    });
+    h += `<button class="sm" style="margin-top:10px" data-a="logAddSet" data-i="${i}">+ Serie</button>${last ? `<span class="mu sm" style="margin-left:10px">En gris: la vez anterior</span>` : ''}</div>`;
+  });
+  h += `<button class="big" style="background:var(--s1)" data-a="logAddEx">+ Añadir ejercicio</button>`;
+  return h;
+}
 function vHistory() {
-  let h = '<h1>Historial</h1>';
+  let h = `<div class="row" style="margin-bottom:20px"><h1 class="sp" style="margin:0">Historial</h1><button class="sm" data-a="logPast">+ Registrar</button></div>`;
   if (!S.sessions.length) return h + '<div class="card mu">Todavía no hay entrenamientos registrados.</div>';
   let month = '';
   [...S.sessions].reverse().forEach(s => {
@@ -1059,6 +1084,52 @@ const A = {
   confirmOk: () => { const cb = confirmCb; confirmCb = null; closeModal(); cb && cb(); },
 
   // rutinas
+  logPast: () => {
+    const P = plan(), def = P.next ? P.next.id : (P.act[0] ? P.act[0].id : '');
+    openModal(`<div class="t" style="font-size:19px">Registrar un entrenamiento</div>
+      <p class="mu sm">Para anotar uno que no registraste en el momento.</p>
+      <label class="f"><span>Rutina</span><select id="lr">${P.act.map(r => `<option value="${r.id}" ${r.id === def ? 'selected' : ''}>${esc(r.name)}${P.done.has(r.id) ? ' · ✓ esta semana' : ''}</option>`).join('')}<option value="">Sesión libre</option></select></label>
+      <div class="row" style="gap:8px;align-items:flex-start"><label class="f sp"><span>Día</span><input type="date" id="ld" value="${ymd(Date.now() - 86400000)}" max="${ymd(Date.now())}"></label>
+      <label class="f sp"><span>Hora de inicio</span><input type="time" id="lt" value="19:00"></label></div>
+      <label class="f"><span>Duración</span><select id="lm">${[30, 45, 60, 75, 90, 105, 120, 150].map(m => `<option value="${m}" ${m === 60 ? 'selected' : ''}>${fmtDur(m * 60000)}</option>`).join('')}</select></label>
+      <button class="big pri" data-a="logStart">Continuar</button><button class="big ghost" data-a="closeModal">Cancelar</button>`);
+  },
+  logStart: () => {
+    const ld = $('#ld').value, lt = $('#lt').value || '19:00';
+    if (!ld) { toast('Elegí el día'); return; }
+    const [y, m, dd] = ld.split('-').map(Number), [hh, mi] = lt.split(':').map(Number);
+    const start = new Date(y, m - 1, dd, hh, mi).getTime(), dur = +$('#lm').value * 60000;
+    if (!Number.isFinite(start)) { toast('Revisá la fecha'); return; }
+    if (start > Date.now()) { toast('Esa fecha todavía no llegó'); return; }
+    const r = S.routines.find(x => x.id === $('#lr').value);
+    logD = { routineId: r ? r.id : null, name: r ? r.name : 'Sesión libre', start, end: start + dur,
+      exercises: r ? r.items.map(it => { const e = exById(it.exerciseId) || { name: '(ejercicio)', muscle: '' };
+        return { exerciseId: it.exerciseId, name: e.name, muscle: e.muscle, unilateral: !!e.unilateral, sets: Array.from({ length: it.sets }, () => ({ w: '', r: '' })) }; }) : [] };
+    closeModal(); go('log');
+  },
+  logAddSet: d => { const e = logD.exercises[+d.i]; e.sets.push({ w: '', r: '' }); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  logDelSet: d => { const e = logD.exercises[+d.i]; e.sets.splice(+d.j, 1); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  logDelEx: d => { logD.exercises.splice(+d.i, 1); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  logAddEx: () => openPicker(id => {
+    const e = exById(id); logD.exercises.push({ exerciseId: id, name: e.name, muscle: e.muscle, unilateral: !!e.unilateral, sets: [0, 1, 2].map(() => ({ w: '', r: '' })) });
+    render(); window.scrollTo(0, document.body.scrollHeight);
+  }),
+  logCancel: () => ask('Descartar registro', 'No se va a guardar nada de lo que anotaste acá.', 'Descartar', () => { logD = null; go('history'); }, true),
+  logSave: () => {
+    const L = logD;
+    const exs = L.exercises.map(e => {
+      const b = bestBefore(e.exerciseId, L.start); let bE = b.e1, bW = b.w;
+      const sets = e.sets.map(x => ({ w: num(x.w), r: Math.round(num(x.r)) })).filter(x => Number.isFinite(x.r) && x.r > 0)
+        .map(x => { if (!Number.isFinite(x.w) || x.w < 0) x.w = 0;
+          if (b.any && x.w > 0 && (e1rm(x.w, x.r) > bE + 0.01 || x.w > bW)) x.pr = true;
+          bE = Math.max(bE, e1rm(x.w, x.r)); bW = Math.max(bW, x.w); return x; });
+      return { exerciseId: e.exerciseId, name: e.name, muscle: e.muscle, unilateral: e.unilateral, sets };
+    }).filter(e => e.sets.length);
+    if (!exs.length) { toast('Anotá al menos una serie con repeticiones'); return; }
+    const sess = { id: uid(), routineId: L.routineId, name: L.name, start: L.start, end: L.end, exercises: exs };
+    S.sessions.push(sess); S.sessions.sort((a, b) => a.start - b.start); save();
+    logD = null; R.view = 'history'; go('session', sess.id); toast('Entrenamiento registrado');
+  },
   chooseRoutine: () => {
     const P = plan();
     openModal(`<div class="row"><div class="t sp" style="font-size:19px">¿Qué entrenás hoy?</div><button class="ghost" data-a="closeModal">Cerrar</button></div>
@@ -1277,6 +1348,7 @@ function onField(e) {
   else if (f === 'it') draft.items[+d.i][d.k] = (d.k === 'notes' || d.k === 'startW') ? v : (d.k === 'rest' ? +v : v);
   else if (f === 'pq') { pickQ = v; $('#plist').innerHTML = pickerList(); }
   else if (f === 'hs') { const s = S.sessions.find(x => x.id === R.id); const n = num(v); if (Number.isFinite(n) && n >= 0) { s.exercises[+d.i].sets[+d.j][d.k] = d.k === 'r' ? Math.round(n) : n; save(); } }
+  else if (f === 'lg') { if (logD) logD.exercises[+d.i].sets[+d.j][d.k] = v; }
   else if (f === 'uname') { S.settings.name = v.trim(); save(); }
   else if (f === 'unit') { S.settings.unit = v; save(); }
   else if (f === 'step') { S.settings.step = +v; save(); }
