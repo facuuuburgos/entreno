@@ -26,11 +26,11 @@
 <link rel="apple-touch-startup-image" media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash-640x1136.png">
 <title>Entreno</title>
 <style>
-:root{--sat:env(safe-area-inset-top,0px);color-scheme:dark;--bg:#0a0a0b;--s1:#131316;--s2:#1b1b20;--s3:#26262d;--ln:rgba(255,255,255,.07);--tx:#f4f4f6;--mu:#8a8a94;--mu2:#5c5c66;--ac:#b8f26b;--acd:rgba(184,242,107,.1);--acm:rgba(184,242,107,.3);--gold:#f5c451;--dn:#ff6b6b;--r:20px}
+:root{--sat:env(safe-area-inset-top,0px);--navh:0px;color-scheme:dark;--bg:#0a0a0b;--s1:#131316;--s2:#1b1b20;--s3:#26262d;--ln:rgba(255,255,255,.07);--tx:#f4f4f6;--mu:#8a8a94;--mu2:#5c5c66;--ac:#b8f26b;--acd:rgba(184,242,107,.1);--acm:rgba(184,242,107,.3);--gold:#f5c451;--dn:#ff6b6b;--r:20px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-body{padding-top:var(--sat);min-height:100vh}
-#app{max-width:600px;margin:0 auto;padding:16px 20px calc(110px + env(safe-area-inset-bottom))}
+body{min-height:100vh}
+#app{max-width:600px;margin:0 auto;padding:calc(var(--sat) + var(--navh) + 14px) 20px calc(110px + env(safe-area-inset-bottom))}
 h1{font-size:32px;letter-spacing:-.03em;margin:4px 0 20px;font-weight:800;line-height:1.1}
 h2{font-size:13px;color:var(--mu);font-weight:600;margin:32px 0 12px;letter-spacing:.01em}
 p{margin:6px 0 12px}
@@ -119,8 +119,9 @@ textarea{resize:vertical;min-height:56px}
 .chart{width:100%;height:auto;display:block;margin-top:12px}
 
 /* Entrenamiento guiado */
-.head{position:sticky;top:var(--sat);z-index:4;margin:0 -20px;padding:6px 20px 12px;background:rgba(10,10,11,.72);backdrop-filter:saturate(1.5) blur(18px);-webkit-backdrop-filter:saturate(1.5) blur(18px);display:flex;align-items:center;gap:8px}
+.head{display:flex;align-items:center;gap:8px;height:52px;max-width:600px;margin:0 auto;padding:0 20px;position:relative}
 .head .ghost{padding-left:0}
+.head .sm{padding:8px 12px;border-radius:12px}
 .bar{height:3px;background:var(--s2);border-radius:3px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--ac);transition:width .3s}
 .pills{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:14px -20px 0;padding:0 20px 2px;scroll-behavior:smooth}
@@ -372,13 +373,20 @@ button.tile{color:inherit;font:inherit}
 .shtog.on .sw{background:var(--ac)}
 .shtog.on .sw i{transform:translateX(15px)}
 /* Barra translúcida detrás de la hora y la batería del iPhone */
-#sbar{position:fixed;top:0;left:0;right:0;height:var(--sat);z-index:12;pointer-events:none;
-  background:rgba(10,10,11,.62);backdrop-filter:saturate(1.6) blur(20px);-webkit-backdrop-filter:saturate(1.6) blur(20px);transition:box-shadow .25s}
-#sbar.line{box-shadow:0 .5px 0 rgba(255,255,255,.08)}
+#nav{position:fixed;top:0;left:0;right:0;z-index:12;padding-top:var(--sat);
+  background:rgba(10,10,11,.8);backdrop-filter:saturate(1.6) blur(24px);-webkit-backdrop-filter:saturate(1.6) blur(22px);
+  box-shadow:0 .5px 0 rgba(255,255,255,0);transition:box-shadow .25s}
+#nav.line{box-shadow:0 .5px 0 rgba(255,255,255,.09)}
+#nav .navrow{overflow:hidden;transition:height .3s cubic-bezier(.2,.8,.2,1),opacity .25s}
+#nav.root .navrow{height:0;opacity:0}
+#nav.root.show .navrow{height:52px;opacity:1}
+.navtitle{position:absolute;left:50%;top:50%;transform:translate(-50%,-30%);max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-weight:650;font-size:17px;letter-spacing:-.01em;opacity:0;transition:opacity .2s,transform .3s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+#nav.show .navtitle{opacity:1;transform:translate(-50%,-50%)}
 </style>
 </head>
 <body>
-<div id="sbar"></div>
+<header id="nav"><div class="navrow"></div></header>
 <div id="splash"><img src="icon-512.png" alt=""></div>
 <div id="app"></div>
 <div id="rest"></div>
@@ -395,7 +403,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '5.8';
+const KEY = 'entreno.v1', VERSION = '5.9';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -760,10 +768,61 @@ function confetti(n = 120) {
     if (t < 2000) requestAnimationFrame(f); else c.remove();
   })(t0);
 }
+// Una sola barra arriba en toda la app: cubre la hora del iPhone y lleva los botones de cada pantalla.
+// En las pantallas principales aparece al hacer scroll, con el título chico centrado.
+const ROOT_TITLES = { home: 'Inicio', train: 'Entrenar', progress: 'Progreso', history: 'Historial', settings: 'Ajustes', welcome: '' };
+const SUB_TITLES = { streak: 'Racha', consistency: 'Constancia', profile: 'Perfil', exercises: 'Ejercicios', session: 'Entrenamiento', exercise: 'Ejercicio' };
+let navH1 = null;
+function measureSat() {
+  const p = document.createElement('div');
+  p.style.cssText = 'position:fixed;top:0;left:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top)';
+  document.body.appendChild(p);
+  const v = parseFloat(getComputedStyle(p).paddingTop) || 0; p.remove();
+  document.documentElement.style.setProperty('--sat', v + 'px');
+}
+function buildNav(app) {
+  const nav = $('#nav'), row = nav.querySelector('.navrow');
+  const hd = app.querySelector(':scope > .head');
+  const isRoot = !hd;
+  row.innerHTML = '';
+  let head = hd;
+  if (hd) hd.remove(); else { head = document.createElement('div'); head.className = 'head'; }
+  row.appendChild(head);
+  navH1 = null;
+  if (!head.querySelector('.c')) {
+    const h1 = app.querySelector('h1');
+    const txt = isRoot ? ROOT_TITLES[R.view] : (h1 ? h1.textContent.trim() : SUB_TITLES[R.view] || '');
+    if (txt) { const t = document.createElement('div'); t.className = 'navtitle'; t.textContent = txt; head.appendChild(t); }
+    navH1 = h1 || app.querySelector('.streak-hero, .fin');
+  }
+  nav.classList.toggle('root', isRoot);
+  // el título chico usa solo el espacio libre entre los botones de cada lado
+  const t = head.querySelector('.navtitle');
+  if (t && !isRoot) {
+    const hr = head.getBoundingClientRect(), mid = hr.left + hr.width / 2;
+    let l = hr.left + 20, r = hr.right - 20;
+    [...head.children].forEach(el => { if (el === t || el.classList.contains('sp')) return; const b = el.getBoundingClientRect(); if (!b.width) return; if (b.right <= mid) l = Math.max(l, b.right); else if (b.left >= mid) r = Math.min(r, b.left); });
+    t.style.maxWidth = Math.max(60, 2 * Math.min(mid - l, r - mid) - 20) + 'px';
+  }
+  document.documentElement.style.setProperty('--navh', isRoot ? '0px' : '52px');
+  navScroll();
+}
+function navScroll() {
+  const nav = $('#nav'); if (!nav) return;
+  const y = window.scrollY;
+  nav.classList.toggle('line', y > 4);
+  let show;
+  if (navH1 && navH1.isConnected) { const r = navH1.getBoundingClientRect(); show = r.bottom < nav.getBoundingClientRect().bottom + (nav.classList.contains('root') ? 52 : 4); }
+  else show = !nav.classList.contains('root') || y > 60;
+  nav.classList.toggle('show', !!show);
+}
+window.addEventListener('resize', () => { measureSat(); navScroll(); });
+window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
   const views = { streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
+  buildNav(app);
   if (R.view !== lastView) {
     app.classList.remove('enter'); void app.offsetWidth; app.classList.add('enter');
     clearTimeout(enterT); enterT = setTimeout(() => app.classList.remove('enter'), 1100);
@@ -2152,9 +2211,11 @@ async function checkNewVersion() {
   } catch (e) {}
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNewVersion(); });
+measureSat();
 render();
+setTimeout(() => { measureSat(); navScroll(); }, 400);
 if (AUTH) syncNow();
-{ const sb = $('#sbar'); const f = () => sb.classList.toggle('line', window.scrollY > 4); window.addEventListener('scroll', f, { passive: true }); f(); }
+window.addEventListener('scroll', navScroll, { passive: true });
 setTimeout(() => { const sp = $('#splash'); if (!sp) return; sp.classList.add('out'); setTimeout(() => sp.remove(), 600); }, 450);
 </script>
 </body>
