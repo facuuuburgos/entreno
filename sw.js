@@ -1,6 +1,6 @@
 // Permite que la app funcione sin internet.
 // Cuando subas una versión nueva, cambiá este número (v1 -> v2) para que el iPhone la actualice.
-const CACHE = 'entreno-v7';
+const CACHE = 'entreno-v8';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
