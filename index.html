@@ -348,7 +348,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '5.2';
+const KEY = 'entreno.v1', VERSION = '5.3';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -685,7 +685,7 @@ function lineChart(points, suffix) {
 /* ---------- Navegación ---------- */
 let R = { view: S.active ? 'workout' : (cloudOn() && !AUTH && !S.skipWelcome ? 'welcome' : 'home'), id: null, from: 'home' };
 let draft = null, editHist = false, peek = false, metric = 'ent', fresh = null;
-function go(view, id = null) { R = { view, id, from: R.view === view ? R.from : R.view }; editHist = false; peek = false; render(); window.scrollTo(0, 0); }
+function go(view, id = null) { if (updPending && !['workout', 'edit', 'log'].includes(view)) { location.reload(); return; } R = { view, id, from: R.view === view ? R.from : R.view }; editHist = false; peek = false; render(); window.scrollTo(0, 0); }
 
 let lastView = null, lastCur = null, justDone = null, bumpF = null, enterT = 0;
 const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1548,7 +1548,7 @@ function vSettings() {
     <div class="row"><span class="sp mu">Entrenamientos</span>${S.sessions.length}</div><div class="sep"></div>
     <div class="row"><span class="sp mu">Almacenamiento protegido</span><span id="persist">…</span></div></div>
   <button class="big ghost danger" data-a="wipe">Borrar todos los datos</button>
-  <p class="sm c" style="margin-top:20px;color:var(--mu2)">Entreno v${VERSION}</p>`;
+  <p class="sm c" style="margin-top:20px;color:var(--mu2)">Entreno v${VERSION} · <button class="link" style="font-size:13px;padding:0" data-a="forceUpdate">Buscar actualización</button></p>`;
 }
 async function fillPersist() {
   const el = $('#persist'); if (!el) return;
@@ -1622,6 +1622,11 @@ const curEx = () => { const a = S.active; ensureCur(a); return a.exercises[a.cur
 function wkRender() { save(); render(); window.scrollTo(0, 0); }
 const A = {
   tab: d => { fresh = null; closeModal(); go(d.v); },
+  forceUpdate: async () => {
+    toast('Buscando actualización…');
+    try { const r = await navigator.serviceWorker.getRegistration(); if (r) await r.update(); } catch (e) {}
+    setTimeout(() => location.reload(), 800);
+  },
   share: d => openShare('session', d.id),
   shareStreak: () => { A.celClose(); openShare('streak'); },
   shTheme: d => { S.settings.shareTheme = d.k; save(false); renderShare(); },
@@ -2022,7 +2027,33 @@ document.addEventListener('focusin', e => { if (e.target.tagName === 'INPUT' && 
 
 /* ---------- Arranque ---------- */
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+// Actualizaciones automáticas: busca versión nueva al abrir la app y cada vez que vuelve a primer plano
+let updPending = false;
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  const hadCtrl = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+    setInterval(check, 30 * 60000);
+  }).catch(() => {});
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadCtrl || updPending) return;
+    updPending = true;
+    if (!['workout', 'edit', 'log'].includes(R.view)) location.reload();
+  });
+}
+// Al volver a abrir la app (si quedó en segundo plano), recarga si hay una versión nueva en internet
+let lastHtmlCheck = Date.now();
+async function checkNewVersion() {
+  if (!location.protocol.startsWith('http') || !navigator.onLine || Date.now() - lastHtmlCheck < 60000) return;
+  lastHtmlCheck = Date.now();
+  try {
+    const t = await (await fetch(location.pathname, { cache: 'no-store' })).text();
+    const m = t.match(/VERSION = '([^']+)'/);
+    if (m && m[1] !== VERSION) { updPending = true; if (!['workout', 'edit', 'log'].includes(R.view)) location.reload(); }
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNewVersion(); });
 render();
 if (AUTH) syncNow();
 setTimeout(() => { const sp = $('#splash'); if (!sp) return; sp.classList.add('out'); setTimeout(() => sp.remove(), 600); }, 450);
