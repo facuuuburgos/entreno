@@ -26,10 +26,10 @@
 <link rel="apple-touch-startup-image" media="screen and (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="splash-640x1136.png">
 <title>Entreno</title>
 <style>
-:root{color-scheme:dark;--bg:#0a0a0b;--s1:#131316;--s2:#1b1b20;--s3:#26262d;--ln:rgba(255,255,255,.07);--tx:#f4f4f6;--mu:#8a8a94;--mu2:#5c5c66;--ac:#b8f26b;--acd:rgba(184,242,107,.1);--acm:rgba(184,242,107,.3);--gold:#f5c451;--dn:#ff6b6b;--r:20px}
+:root{--sat:env(safe-area-inset-top,0px);color-scheme:dark;--bg:#0a0a0b;--s1:#131316;--s2:#1b1b20;--s3:#26262d;--ln:rgba(255,255,255,.07);--tx:#f4f4f6;--mu:#8a8a94;--mu2:#5c5c66;--ac:#b8f26b;--acd:rgba(184,242,107,.1);--acm:rgba(184,242,107,.3);--gold:#f5c451;--dn:#ff6b6b;--r:20px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-body{padding-top:env(safe-area-inset-top);min-height:100vh}
+body{padding-top:var(--sat);min-height:100vh}
 #app{max-width:600px;margin:0 auto;padding:16px 20px calc(110px + env(safe-area-inset-bottom))}
 h1{font-size:32px;letter-spacing:-.03em;margin:4px 0 20px;font-weight:800;line-height:1.1}
 h2{font-size:13px;color:var(--mu);font-weight:600;margin:32px 0 12px;letter-spacing:.01em}
@@ -119,7 +119,7 @@ textarea{resize:vertical;min-height:56px}
 .chart{width:100%;height:auto;display:block;margin-top:12px}
 
 /* Entrenamiento guiado */
-.head{position:sticky;top:0;z-index:4;margin:0 -20px;padding:6px 20px 12px;background:rgba(10,10,11,.72);backdrop-filter:saturate(1.5) blur(18px);-webkit-backdrop-filter:saturate(1.5) blur(18px);display:flex;align-items:center;gap:8px}
+.head{position:sticky;top:var(--sat);z-index:4;margin:0 -20px;padding:6px 20px 12px;background:rgba(10,10,11,.72);backdrop-filter:saturate(1.5) blur(18px);-webkit-backdrop-filter:saturate(1.5) blur(18px);display:flex;align-items:center;gap:8px}
 .head .ghost{padding-left:0}
 .bar{height:3px;background:var(--s2);border-radius:3px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--ac);transition:width .3s}
@@ -327,8 +327,8 @@ button.tile{color:inherit;font:inherit}
 .shprev{text-align:center;margin:12px 0 10px}
 .shcard{position:relative;display:inline-block;border-radius:18px;overflow:hidden;box-shadow:0 30px 70px -25px rgba(0,0,0,.95),0 0 0 1px rgba(255,255,255,.07);
   animation:shIn .75s cubic-bezier(.2,.8,.2,1) .05s both,shFloat 6s ease-in-out .9s infinite;will-change:transform}
-.shcard img{display:block;height:min(50vh,460px);aspect-ratio:9/16;transition:opacity .2s ease,transform .3s cubic-bezier(.2,.8,.2,1),filter .3s ease}
-.shcard img.swap{opacity:0;transform:scale(.95);filter:blur(8px)}
+.shcard img{display:block;height:min(50vh,460px);aspect-ratio:9/16;transition:opacity .18s ease}
+.shcard img.swap{opacity:0}
 .shine{position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.2) 47%,rgba(255,255,255,.05) 55%,transparent 68%);transform:translateX(-110%);animation:sweep 4s cubic-bezier(.4,0,.2,1) 1.1s infinite}
 @keyframes sweep{0%{transform:translateX(-110%)}40%,100%{transform:translateX(110%)}}
 @keyframes shIn{from{opacity:0;transform:translateY(46px) scale(.88) rotate(-3deg)}to{opacity:1;transform:none}}
@@ -371,9 +371,14 @@ button.tile{color:inherit;font:inherit}
 .shtog.on{color:var(--tx)}
 .shtog.on .sw{background:var(--ac)}
 .shtog.on .sw i{transform:translateX(15px)}
+/* Barra translúcida detrás de la hora y la batería del iPhone */
+#sbar{position:fixed;top:0;left:0;right:0;height:var(--sat);z-index:12;pointer-events:none;
+  background:rgba(10,10,11,.62);backdrop-filter:saturate(1.6) blur(20px);-webkit-backdrop-filter:saturate(1.6) blur(20px);transition:box-shadow .25s}
+#sbar.line{box-shadow:0 .5px 0 rgba(255,255,255,.08)}
 </style>
 </head>
 <body>
+<div id="sbar"></div>
 <div id="splash"><img src="icon-512.png" alt=""></div>
 <div id="app"></div>
 <div id="rest"></div>
@@ -390,7 +395,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '5.6';
+const KEY = 'entreno.v1', VERSION = '5.8';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1461,7 +1466,7 @@ function renderShare() {
   const th = S.settings.shareTheme || 'lima', url = makeShare(th);
   if (!url) return;
   openModal(`<div class="row"><div class="t sp" style="font-size:19px">Compartir</div><button class="ghost" data-a="closeModal">Cerrar</button></div>
-    <div class="shprev"><div class="shcard"><img id="shimg" src="${url}" alt="Imagen para compartir"><i class="shine"></i></div></div>
+    <div class="shprev"><div class="shcard"><img id="shimg" src="${url}" alt="Imagen para compartir"></div></div>
     <div class="shth">${Object.keys(SH_THEMES).map(k => `<button class="${k === th ? 'on' : ''}" style="--c:${SH_THEMES[k][0]}" data-a="shTheme" data-k="${k}" aria-label="Color ${k}"></button>`).join('')}</div>
     ${shareCtx.kind === 'session' ? `<div class="c"><button class="shtog ${S.settings.shareWeights !== false ? 'on' : ''}" data-a="shWeights"><span class="sw"><i></i></span>Mostrar pesos</button></div>` : ''}
     <button class="big pri shbtn" data-a="doShare">${SHARE_ICO}<span>Compartir imagen</span></button>
@@ -2149,6 +2154,7 @@ async function checkNewVersion() {
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNewVersion(); });
 render();
 if (AUTH) syncNow();
+{ const sb = $('#sbar'); const f = () => sb.classList.toggle('line', window.scrollY > 4); window.addEventListener('scroll', f, { passive: true }); f(); }
 setTimeout(() => { const sp = $('#splash'); if (!sp) return; sp.classList.add('out'); setTimeout(() => sp.remove(), 600); }, 450);
 </script>
 </body>
