@@ -383,6 +383,47 @@ button.tile{color:inherit;font:inherit}
 .navtitle{position:absolute;left:50%;top:50%;transform:translate(-50%,-30%);max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   font-weight:650;font-size:17px;letter-spacing:-.01em;opacity:0;transition:opacity .2s,transform .3s cubic-bezier(.2,.8,.2,1);pointer-events:none}
 #nav.show .navtitle{opacity:1;transform:translate(-50%,-50%)}
+.card.prog{background:radial-gradient(120% 120% at 100% 0%,rgba(184,242,107,.1),rgba(184,242,107,0) 60%),var(--s1)}
+.card.info{box-shadow:inset 0 0 0 1.5px rgba(155,140,255,.35);align-items:flex-start}
+.phchip{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650;padding:5px 11px 5px 9px;border-radius:99px;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c)}
+.phchip i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.tl{display:flex;gap:4px;margin-top:14px}
+.tl.tlb{margin-top:0}
+.tl-s{position:relative;height:8px;border-radius:6px;background:color-mix(in srgb,var(--c) 22%,var(--s3));overflow:hidden}
+.tl-s i{position:absolute;left:0;top:0;bottom:0;background:var(--c);border-radius:6px;transition:width .6s cubic-bezier(.2,.8,.2,1)}
+.tl.tlb .tl-s{height:auto;min-height:44px;border-radius:12px;display:flex;align-items:flex-end;padding:6px 8px}
+.tl.tlb .tl-s i{opacity:.35;border-radius:0}
+.tl.tlb .tl-s span{position:relative;font-size:11px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl.tlb .tl-s.now{box-shadow:inset 0 0 0 2px var(--c)}
+.tl-legend{margin-top:8px}
+#app.enter .tl-s i{animation:tlgrow .9s cubic-bezier(.2,.8,.2,1) .2s both}
+@keyframes tlgrow{from{width:0!important}}
+.card.phase{position:relative}
+.phnum{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:800;color:#0a0a0b;background:var(--c)}
+.mini{display:flex;align-items:center;gap:12px}
+.mini button{width:36px;height:36px;border-radius:50%;padding:0;font-size:20px}
+.mini b{min-width:22px;text-align:center;font-size:18px}
+.toggle{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;padding:10px 0;border-radius:0;line-height:1.35}
+.toggle:active{transform:none}
+.toggle .sw{width:46px;height:28px;border-radius:99px;background:var(--s3);position:relative;flex-shrink:0;transition:background .25s}
+.toggle .sw i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .3s cubic-bezier(.2,.9,.3,1.3)}
+.toggle.on .sw{background:var(--ac)}
+.toggle.on .sw i{transform:translateX(18px)}
+.wt-h,.wt-r{display:grid;grid-template-columns:76px 1fr 78px;gap:10px;align-items:center}
+.wt-h{font-size:12px;padding-bottom:6px}
+.wt-r{padding:7px 0;border-top:1px solid var(--ln)}
+.wt-r input{width:84px;text-align:center;padding:8px 6px}
+.wt-r select{padding:8px 6px;text-align:center}
+.wt-r.cur b{color:var(--ac)}
+.pick.tpl{align-items:flex-start;padding:16px 2px}
+.pick.tpl i{width:12px;height:12px;border-radius:50%;background:var(--c);margin-top:5px;flex-shrink:0}
+.rx{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.rx span{font-size:12.5px;font-weight:650;padding:4px 10px;border-radius:99px;background:var(--s1);color:var(--tx)}
+.rx .rxi{width:26px;height:26px;border-radius:50%;padding:0;font-size:13px;font-weight:700;background:var(--s1);color:var(--mu)}
+.rirq{margin-top:24px;text-align:center}
+.rirc{display:flex;gap:8px;justify-content:center;margin-top:10px}
+.rirc button{width:48px;height:48px;border-radius:50%;padding:0;font-size:17px;font-weight:700;background:var(--s1)}
+.rirc button.on{background:var(--ac);color:#0a0a0b}
 </style>
 </head>
 <body>
@@ -403,7 +444,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '5.9';
+const KEY = 'entreno.v1', VERSION = '6.0';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -515,8 +556,88 @@ function migrate(d) {
   return d;
 }
 function load() {
-  try { const raw = localStorage.getItem(KEY); if (raw) return importSheet(migrate(JSON.parse(raw))); } catch (e) {}
-  return importSheet(migrate(seed()));
+  try { const raw = localStorage.getItem(KEY); if (raw) return migratePrograms(importSheet(migrate(JSON.parse(raw)))); } catch (e) {}
+  return migratePrograms(importSheet(migrate(seed())));
+}
+/* ---------- Programas y fases ---------- */
+// Plantillas de fase: valores típicos que después se pueden editar
+const TPL = {
+  fr: { name: 'Fuerza resistencia', color: '#6be3f2', weeks: 4, sets: 3, repMin: 15, repMax: 20, pct: 55, rir: 3, rest: 60, step: 2.5, deload: false,
+    desc: 'Muchas repeticiones con cargas livianas y descansos cortos. Mejora la resistencia muscular y prepara tendones y articulaciones.' },
+  fh: { name: 'Fuerza hipertrofia', color: '#b8f26b', weeks: 6, sets: 4, repMin: 8, repMax: 12, pct: 70, rir: 2, rest: 120, step: 2, deload: true,
+    desc: 'El rango clásico para ganar músculo: cargas moderadas, cerca del fallo, volumen alto.' },
+  fm: { name: 'Fuerza máxima', color: '#ff8a3d', weeks: 4, sets: 5, repMin: 3, repMax: 5, pct: 85, rir: 2, rest: 210, step: 2.5, deload: true,
+    desc: 'Pocas repeticiones con cargas altas y descansos largos. Para ganar fuerza en los ejercicios principales.' },
+  dl: { name: 'Descarga', color: '#9b8cff', weeks: 1, sets: 2, repMin: 8, repMax: 10, pct: 55, rir: 4, rest: 90, step: 0, deload: false,
+    desc: 'Una semana liviana para recuperarte entre fases. Se mantiene el movimiento, baja la fatiga.' },
+  cu: { name: 'Personalizada', color: '#8a8a94', weeks: 4, step: 0, deload: false, desc: 'Configurás todo vos: series, repeticiones, intensidad y descansos.' },
+};
+const tplOf = ph => TPL[ph && ph.type] || TPL.cu;
+function migratePrograms(d) {
+  d.programs = d.programs || [];
+  if ((d.progV || 0) < 1) {
+    // Las rutinas que ya tenías pasan a ser la fase 1 de "Mi plan" (ids fijos para que dos dispositivos no las dupliquen)
+    const loose = d.routines.filter(r => !r.archived && !r.phaseId);
+    if (loose.length && !d.programs.length) {
+      d.programs.push({ id: 'prog-main', name: 'Mi plan', active: true, u: 1,
+        phases: [{ id: 'ph-main', name: 'Fuerza hipertrofia', type: 'fh', weeks: 6, step: 0, deload: false, wk: {}, days: loose.map(r => r.id) }],
+        cur: { pid: 'ph-main', ws: weekStart() } });
+      loose.forEach(r => r.phaseId = 'ph-main');
+      d.progNew = true;
+    }
+    d.progV = 1;
+  }
+  return d;
+}
+const activeProg = () => S.programs.find(p => p.active) || null;
+function findPhase(pid) { for (const p of S.programs) { const i = p.phases.findIndex(x => x.id === pid); if (i >= 0) return { prog: p, ph: p.phases[i], idx: i }; } return null; }
+const WEEK = 7 * 864e5;
+// Fase y semana actuales del programa activo
+function progCtx(p = activeProg()) {
+  if (!p || !p.phases.length) return null;
+  let idx = p.phases.findIndex(x => p.cur && x.id === p.cur.pid);
+  if (idx < 0) { idx = 0; p.cur = { pid: p.phases[0].id, ws: weekStart() }; }
+  const ph = p.phases[idx], w = Math.max(1, Math.round((weekStart() - p.cur.ws) / WEEK) + 1);
+  return { prog: p, ph, idx, w, wEff: Math.min(w, ph.weeks), done: w > ph.weeks, next: p.phases[idx + 1] || null };
+}
+// Ajuste de cada semana: regla automática (+% por semana) que se puede pisar a mano
+function weekParams(ph, w) {
+  const o = (ph.wk || {})[w] || {}, deload = !!ph.deload && w === ph.weeks && ph.weeks > 1;
+  const auto = deload ? -12 : (w - 1) * (+ph.step || 0);
+  const dp = o.dp !== undefined && o.dp !== '' && o.dp !== null ? +o.dp : auto;
+  const ds = o.ds !== undefined && o.ds !== '' && o.ds !== null ? +o.ds : (deload ? -1 : 0);
+  return { dp, ds, deload, auto, custom: o.dp !== undefined && o.dp !== '' && o.dp !== null };
+}
+function prescribe(it, ph, w) {
+  const p = ph ? weekParams(ph, w) : { dp: 0, ds: 0, deload: false };
+  const base = num(it.pct);
+  return { sets: Math.max(1, (+it.sets || 3) + p.ds), repMin: it.repMin, repMax: it.repMax, rest: it.rest,
+    pct: Number.isFinite(base) && base > 0 ? Math.round((base + p.dp) * 10) / 10 : null,
+    rir: it.rir === null || it.rir === undefined || it.rir === '' ? null : Math.min(5, +it.rir + (p.deload ? 2 : 0)), deload: p.deload };
+}
+function planDays() {
+  const c = progCtx();
+  if (c) return c.ph.days.map(id => S.routines.find(r => r.id === id)).filter(r => r && !r.archived);
+  return S.routines.filter(r => !r.archived && !r.phaseId);
+}
+// Fuerza máxima estimada actual (últimas 3 sesiones de ese ejercicio, contando las reps en reserva si las anotaste)
+function curE1(exId, before = Infinity) {
+  let n = 0, best = 0;
+  for (let i = S.sessions.length - 1; i >= 0 && n < 3; i--) {
+    const s = S.sessions[i]; if (s.start >= before) continue;
+    const e = s.exercises.find(x => x.exerciseId === exId); if (!e) continue;
+    n++; e.sets.forEach(x => { if (x.w > 0) best = Math.max(best, e1rm(x.w, x.r + (x.rir || 0))); });
+  }
+  return best;
+}
+const roundTo = (v, st) => r2(Math.round(v / st) * st);
+const touch = o => { o.u = Date.now(); return o; };
+function copyDay(r, phId) { const c = JSON.parse(JSON.stringify(r)); c.id = uid(); c.phaseId = phId; c.u = Date.now(); c.items.forEach(it => it.id = uid()); return c; }
+function applyTpl(ph, key, items = true) {
+  const t = TPL[key]; ph.type = key;
+  if (key !== 'cu') { ph.weeks = t.weeks; ph.step = t.step; ph.deload = t.deload; ph.wk = {}; }
+  if (items && key !== 'cu') ph.days.forEach(id => { const r = S.routines.find(x => x.id === id); if (!r) return;
+    r.items.forEach(it => Object.assign(it, { sets: t.sets, repMin: t.repMin, repMax: t.repMax, rest: t.rest, pct: t.pct, rir: t.rir })); touch(r); });
 }
 let S = load();
 function save(touch = true) {
@@ -610,6 +731,8 @@ function mergeData(L, Rm) {
   other.routines = other.routines.filter(r => base.routines.some(b => b.id === r.id) || !base.routines.some(b => norm(b.name) === norm(r.name)));
   other.routines.forEach(r => r.items.forEach(it => it.exerciseId = fix(it.exerciseId)));
   base.routines = union(base.routines, other.routines);
+  base.programs = union(base.programs || [], other.programs || []);
+  if (base.programs.filter(p => p.active).length > 1) { const keep = [...base.programs].filter(p => p.active).sort((a, b) => (b.u || 0) - (a.u || 0))[0]; base.programs.forEach(p => p.active = p === keep); }
   base.sessions = union(base.sessions, other.sessions).sort((x, y) => x.start - y.start);
   base.exercises = union(base.exercises, other.exercises);
   base.body = union(base.body || [], other.body || []).sort((x, y) => x.date - y.date);
@@ -771,7 +894,7 @@ function confetti(n = 120) {
 // Una sola barra arriba en toda la app: cubre la hora del iPhone y lleva los botones de cada pantalla.
 // En las pantallas principales aparece al hacer scroll, con el título chico centrado.
 const ROOT_TITLES = { home: 'Inicio', train: 'Entrenar', progress: 'Progreso', history: 'Historial', settings: 'Ajustes', welcome: '' };
-const SUB_TITLES = { streak: 'Racha', consistency: 'Constancia', profile: 'Perfil', exercises: 'Ejercicios', session: 'Entrenamiento', exercise: 'Ejercicio' };
+const SUB_TITLES = { program: 'Programa', phase: 'Fase', streak: 'Racha', consistency: 'Constancia', profile: 'Perfil', exercises: 'Ejercicios', session: 'Entrenamiento', exercise: 'Ejercicio' };
 let navH1 = null;
 function measureSat() {
   const p = document.createElement('div');
@@ -812,14 +935,18 @@ function navScroll() {
   const y = window.scrollY;
   nav.classList.toggle('line', y > 4);
   let show;
-  if (navH1 && navH1.isConnected) { const r = navH1.getBoundingClientRect(); show = r.bottom < nav.getBoundingClientRect().bottom + (nav.classList.contains('root') ? 52 : 4); }
+  if (navH1 && navH1.isConnected) {
+    const r = navH1.getBoundingClientRect(), sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
+    // pantallas principales: la barra aparece recién cuando el título grande se fue debajo de la hora
+    show = nav.classList.contains('root') ? r.bottom < sat + 6 && y > 10 : r.bottom < nav.getBoundingClientRect().bottom + 4;
+  }
   else show = !nav.classList.contains('root') || y > 60;
   nav.classList.toggle('show', !!show);
 }
 window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
-  const views = { streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -834,7 +961,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home' };
+  const tabOf = { session: 'history', exercise: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -847,14 +974,14 @@ function render() {
 
 /* ---------- Inicio ---------- */
 function plan() {
-  const act = S.routines.filter(r => !r.archived), ws = weekStart();
+  const act = planDays(), ws = weekStart();
   const wk = S.sessions.filter(s => s.start >= ws);
   const done = new Set(wk.map(s => s.routineId).filter(Boolean));
   const next = act.find(r => !done.has(r.id)) || null;
   const today = S.sessions.filter(s => dayKey(s.start) === dayKey(Date.now()));
   return { act, wk, done, next, today, count: act.filter(r => done.has(r.id)).length };
 }
-function autoGoal() { return Math.max(1, S.routines.filter(r => !r.archived).length); }
+function autoGoal() { return Math.max(1, planDays().length); }
 function weeklyGoal() { const g = +S.settings.weekGoal; return g > 0 ? g : autoGoal(); }
 function weekCount(ws) { const we = addDays(ws, 7); return S.sessions.filter(s => s.start >= ws && s.start < we).length; }
 function trainedDays(ws) { const we = addDays(ws, 7), set = new Set(); S.sessions.forEach(s => { if (s.start >= ws && s.start < we) set.add(dayKey(s.start)); }); return set; }
@@ -978,9 +1105,15 @@ function vHome() {
     const a = S.active, T = wkTotals(a);
     h += `<div class="today"><div class="kicker" style="color:var(--ac)">En curso</div><div class="n">${esc(a.name)}</div>
       <div class="mu">${T.dn} de ${T.tot} series · empezado a las ${fmtTime(a.start)}</div><button class="pri big cta" style="margin-top:18px" data-a="resume">Continuar</button></div>`;
+  } else if (progCtx() && progCtx().done) {
+    const c = progCtx();
+    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Fase completada 🎉</div><div class="n">${esc(c.ph.name)}</div>
+      <div class="mu">Terminaste las ${c.ph.weeks} semanas.${c.next ? ` Sigue <b style="color:var(--tx)">${esc(c.next.name)}</b>.` : ''}</div>
+      ${c.next ? `<button class="pri big cta" style="margin-top:18px" data-a="advancePhase">Empezar ${esc(c.next.name)}</button>` : `<button class="pri big cta" style="margin-top:18px" data-a="openProgram" data-id="${c.prog.id}">Ver mi programa</button>`}
+      <button class="big" style="margin-top:8px;background:rgba(255,255,255,.07)" data-a="extendPhase">Una semana más</button></div>`;
   } else if (!P.act.length) {
-    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Empecemos</div><div class="n">Armá tu plan</div><div class="mu">Creá tus rutinas en el orden en que las hacés y la app te va guiando semana a semana.</div>
-      <button class="pri big cta" style="margin-top:18px" data-a="newRoutine">Crear mi primera rutina</button>
+    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Empecemos</div><div class="n">Armá tu plan</div><div class="mu">Creá un programa con sus fases y días, y la app te va guiando semana a semana.</div>
+      <button class="pri big cta" style="margin-top:18px" data-a="newProgram">Crear mi programa</button>
       <button class="big" style="margin-top:8px;background:rgba(255,255,255,.07)" data-a="startFree">Hacer una sesión libre</button></div>`;
   } else if (P.today.length) {
     const t = P.today[P.today.length - 1];
@@ -990,8 +1123,10 @@ function vHome() {
       <button class="big" style="margin-top:16px;background:rgba(255,255,255,.07)" data-a="chooseRoutine">Entrenar de nuevo</button></div>`;
   } else if (P.next) {
     const r = P.next;
-    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Tu próximo entrenamiento · ${P.count + 1} de ${P.act.length}</div><div class="n">${esc(r.name)}</div>
-      <div class="mu">${r.items.length} ejercicios · ~${routineMin(r)} min</div>${chips(r)}
+    const c = progCtx();
+    h += `<div class="today"><div class="kicker" style="color:var(--ac)">Tu próximo entrenamiento · Día ${P.act.indexOf(r) + 1} de ${P.act.length}</div><div class="n">${esc(r.name)}</div>
+      <div class="mu">${r.items.length} ejercicios · ~${routineMin(r)} min</div>
+      ${c ? `<div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">${phaseChip(c.ph)}<span class="mu sm">Semana ${c.w} de ${c.ph.weeks} · ${rxSummary(r, c.ph, c.wEff)}</span></div>` : ''}${chips(r)}
       <button class="pri big cta" style="margin:0" data-a="start" data-id="${r.id}">Empezar</button>${other}</div>`;
   } else {
     h += `<div class="today"><div class="kicker" style="color:var(--ac)">Semana completa 🔥</div><div class="n">¡Cumpliste tu plan!</div>
@@ -1027,24 +1162,59 @@ function sessCard(s) {
 }
 
 /* ---------- Entrenar ---------- */
+function rxSummary(r, ph, w) {
+  const it = r.items[0]; if (!it) return '';
+  const p = prescribe(it, ph, w);
+  return [`${p.sets} × ${repsTxt(p.repMin, p.repMax)}`, p.pct ? fmtNum(p.pct) + '%' : '', p.rir != null ? 'RIR ' + p.rir : ''].filter(Boolean).join(' · ');
+}
+function timeline(p, big) {
+  const total = p.phases.reduce((a, x) => a + (+x.weeks || 1), 0) || 1, c = p.active ? progCtx(p) : null;
+  let segs = p.phases.map((x, i) => {
+    const st = !c ? '' : i < c.idx ? 'past' : i === c.idx ? 'now' : '';
+    const fill = st === 'past' ? 100 : st === 'now' ? Math.min(100, (c.wEff - (c.done ? 0 : 0.5)) / x.weeks * 100) : 0;
+    return `<div class="tl-s ${st}" style="flex:${+x.weeks || 1};--c:${tplOf(x).color}"><i style="width:${fill}%"></i>${big ? `<span>${esc(x.name)}</span>` : ''}</div>`;
+  }).join('');
+  return `<div class="tl ${big ? 'tlb' : ''}">${segs}</div>${big ? '' : ''}<div class="tl-legend mu sm">${total} ${total === 1 ? 'semana' : 'semanas'} · ${p.phases.length} ${p.phases.length === 1 ? 'fase' : 'fases'}</div>`;
+}
+function phaseChip(ph) { return `<span class="phchip" style="--c:${tplOf(ph).color}"><i></i>${esc(ph.name)}</span>`; }
 function vTrain() {
-  const P = plan(), arc = S.routines.filter(r => r.archived);
-  let h = `<div class="row" style="margin-bottom:8px"><h1 class="sp" style="margin:0">Entrenar</h1><button class="sm" data-a="tab" data-v="exercises">Ejercicios</button><button class="sm" data-a="newRoutine">+ Rutina</button></div>
-    <p class="mu sm" style="margin:0 0 18px">Tu plan semanal, en orden. Cada lunes vuelve a empezar.</p>`;
+  const P = plan(), c = progCtx(), arc = S.routines.filter(r => r.archived), others = S.programs.filter(p => !p.active);
+  const loose = S.routines.filter(r => !r.archived && !r.phaseId);
+  let h = `<div class="row" style="margin-bottom:18px"><h1 class="sp" style="margin:0">Entrenar</h1><button class="sm" data-a="tab" data-v="exercises">Ejercicios</button><button class="sm" data-a="newProgram">+ Programa</button></div>`;
   if (S.active) h += `<div class="card hl row"><div class="sp"><div class="kicker" style="color:var(--ac)">En curso</div><div class="t">${esc(S.active.name)}</div></div><button class="pri" data-a="resume">Continuar</button></div>`;
-  if (!P.act.length) h += `<div class="card c" style="padding:28px 18px"><div style="font-size:40px">🗂️</div><div class="t" style="margin-top:8px">Todavía no tenés rutinas</div>
-    <p class="mu sm">Creá una por cada día de tu plan (por ejemplo Torso A, Pierna…). El orden de esta lista es el orden en que te las va a sugerir.</p>
-    <button class="big pri" data-a="newRoutine">Crear rutina</button></div>`;
-  P.act.forEach((r, k) => {
-    const dn = P.done.has(r.id), nx = P.next && P.next.id === r.id, ms = routineMuscles(r);
-    h += `<div class="card ${nx ? 'hl' : ''}"><div class="row" style="align-items:flex-start">
-      <div class="sp clickable" data-a="routineMenu" data-id="${r.id}"><div class="row" style="gap:8px"><span class="mu sm" style="font-weight:700">${k + 1}</span><span class="t" style="font-size:19px">${esc(r.name)}</span></div>
-      <div class="row mu sm" style="margin-top:4px;gap:8px;flex-wrap:wrap">${nx ? '<span class="badge ac">Siguiente</span>' : dn ? '<span class="badge">✓ Esta semana</span>' : ''}<span>${r.items.length} ejercicios · ~${routineMin(r)} min</span></div>
-      ${ms.length ? `<div class="mu sm" style="margin-top:8px">${esc(ms.join(', '))}</div>` : ''}</div>
-      <button class="${nx ? 'pri' : ''}" data-a="start" data-id="${r.id}">Empezar</button></div></div>`;
-  });
-  h += `<div class="row" style="gap:8px"><button class="big sp" style="background:var(--s1)" data-a="startFree">Sesión libre</button><button class="big sp" style="background:var(--s1)" data-a="logPast">Registrar uno pasado</button></div>`;
-  if (P.act.length) h += `<p class="mu sm c" style="margin-top:14px">Tocá una rutina para editarla, duplicarla, cambiarla de lugar en el plan o archivarla.</p>`;
+  if (S.progNew && c) h += `<div class="card row info"><div style="font-size:26px">🗂️</div><div class="sp"><div class="t">Tus rutinas ahora son un programa</div>
+    <div class="mu sm">Están como la primera fase de “${esc(c.prog.name)}”. Podés sumarle fases (fuerza, hipertrofia, descarga…) y la app te va guiando semana a semana.</div></div><button class="ghost" data-a="dismissProgNew" aria-label="Cerrar">✕</button></div>`;
+  if (!c && !loose.length) {
+    h += `<div class="card c" style="padding:28px 18px"><div style="font-size:40px">🗂️</div><div class="t" style="margin-top:8px">Armá tu primer programa</div>
+      <p class="mu sm">Un programa tiene fases (por ejemplo fuerza resistencia → hipertrofia → fuerza máxima) y cada fase tiene sus días de entrenamiento. La app te guía semana a semana y ajusta los pesos.</p>
+      <button class="big pri" data-a="newProgram">Crear programa</button></div>`;
+  }
+  if (c) {
+    const { prog, ph, w, done } = c;
+    h += `<div class="card prog clickable" data-a="openProgram" data-id="${prog.id}">
+      <div class="row"><div class="sp"><div class="kicker">Programa activo</div><div class="t" style="font-size:22px;margin-top:2px">${esc(prog.name)}</div></div><span class="mu">›</span></div>
+      <div class="row" style="margin:12px 0 2px;gap:8px;flex-wrap:wrap">${phaseChip(ph)}<span class="mu sm">${done ? '✓ Fase completada' : `Semana ${w} de ${ph.weeks}`}${weekParams(ph, c.wEff).deload ? ' · descarga' : ''}</span></div>
+      ${timeline(prog)}</div>`;
+    if (done) h += phaseDoneCard(c);
+    h += `<div class="row" style="margin:28px 0 12px"><h2 class="sp" style="margin:0">Días · ${esc(ph.name)}</h2><button class="link" data-a="openPhase" data-id="${ph.id}">Editar fase</button></div>`;
+    if (!P.act.length) h += `<div class="card c"><p class="mu sm" style="margin-top:0">Esta fase todavía no tiene días.</p><button class="big pri" data-a="newDay" data-id="${ph.id}">+ Agregar día</button></div>`;
+    P.act.forEach((r, k) => {
+      const dn = P.done.has(r.id), nx = P.next && P.next.id === r.id;
+      h += `<div class="card ${nx ? 'hl' : ''}"><div class="row" style="align-items:flex-start">
+        <div class="sp clickable" data-a="routineMenu" data-id="${r.id}"><div class="kicker" style="font-size:11px">Día ${k + 1}</div><div class="t" style="font-size:19px;margin-top:2px">${esc(r.name)}</div>
+        <div class="row mu sm" style="margin-top:6px;gap:8px;flex-wrap:wrap">${nx ? '<span class="badge ac">Siguiente</span>' : dn ? '<span class="badge">✓ Esta semana</span>' : ''}<span>${r.items.length} ejercicios · ${rxSummary(r, ph, c.wEff)}</span></div></div>
+        <button class="${nx ? 'pri' : ''}" data-a="start" data-id="${r.id}">Empezar</button></div></div>`;
+    });
+  }
+  if (loose.length) {
+    h += `<h2>${c ? 'Rutinas sueltas' : 'Tus rutinas'}</h2>`;
+    loose.forEach(r => h += `<div class="card row"><div class="sp clickable" data-a="routineMenu" data-id="${r.id}"><div class="t">${esc(r.name)}</div><div class="mu sm">${r.items.length} ejercicios</div></div><button data-a="start" data-id="${r.id}">Empezar</button></div>`);
+  }
+  h += `<div class="row" style="gap:8px;margin-top:8px"><button class="big sp" style="background:var(--s1)" data-a="startFree">Sesión libre</button><button class="big sp" style="background:var(--s1)" data-a="logPast">Registrar uno pasado</button></div>`;
+  if (others.length) {
+    h += `<h2>Otros programas</h2>`;
+    others.forEach(p => h += `<div class="card clickable" data-a="openProgram" data-id="${p.id}"><div class="row"><div class="sp"><div class="t">${esc(p.name)}</div></div><span class="mu">›</span></div>${timeline(p)}</div>`);
+  }
   if (arc.length) {
     h += `<h2>Archivadas</h2>`;
     arc.forEach(r => h += `<div class="card row"><div class="sp"><div class="t mu">${esc(r.name)}</div><div class="mu sm">${r.items.length} ejercicios</div></div>
@@ -1052,11 +1222,86 @@ function vTrain() {
   }
   return h;
 }
+function phaseDoneCard(c) {
+  return `<div class="card hl"><div class="t">🎉 Terminaste ${esc(c.ph.name)}</div>
+    <div class="mu sm" style="margin-top:2px">${c.next ? `Lo que sigue en tu programa: <b style="color:var(--tx)">${esc(c.next.name)}</b> (${c.next.weeks} ${c.next.weeks === 1 ? 'semana' : 'semanas'}).` : 'Era la última fase del programa. Podés sumar otra o repetir.'}</div>
+    ${c.next ? `<button class="big pri" data-a="advancePhase">Empezar ${esc(c.next.name)}</button>` : `<button class="big pri" data-a="addPhase" data-id="${c.prog.id}">+ Agregar otra fase</button>`}
+    <button class="big ghost" data-a="extendPhase">Una semana más de ${esc(c.ph.name)}</button></div>`;
+}
+/* ---------- Programa ---------- */
+function vProgram() {
+  const p = S.programs.find(x => x.id === R.id);
+  if (!p) { R.view = 'train'; return vTrain(); }
+  const c = p.active ? progCtx(p) : null;
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button><span class="sp"></span><button class="sm" data-a="progMenu" data-id="${p.id}" aria-label="Opciones">•••</button></div>
+    <div class="kicker">${p.active ? '<span style="color:var(--ac)">Programa activo</span>' : 'Programa'}</div><h1 style="margin-top:6px">${esc(p.name)}</h1>
+    <div class="card">${timeline(p, true)}</div>`;
+  if (!p.active) h += `<button class="big pri" data-a="activateProg" data-id="${p.id}">Usar este programa</button>`;
+  if (c && c.done) h += phaseDoneCard(c);
+  h += `<h2>Fases</h2>`;
+  if (!p.phases.length) h += `<div class="card mu">Todavía no tiene fases.</div>`;
+  p.phases.forEach((ph, i) => {
+    const st = !c ? '' : i < c.idx ? 'Completada' : i === c.idx ? (c.done ? '✓ Terminada' : `Actual · semana ${c.w} de ${ph.weeks}`) : 'Próxima';
+    const d0 = ph.days.map(id => S.routines.find(r => r.id === id)).find(Boolean);
+    const p1 = d0 && d0.items[0] ? prescribe(d0.items[0], ph, 1) : null, pN = d0 && d0.items[0] ? prescribe(d0.items[0], ph, Math.max(1, ph.weeks - (ph.deload ? 1 : 0))) : null;
+    const rng = p1 && p1.pct ? (p1.pct === pN.pct ? ` · ${fmtNum(p1.pct)}%` : ` · ${fmtNum(p1.pct)}% → ${fmtNum(pN.pct)}%`) : '';
+    h += `<div class="card phase clickable ${c && i === c.idx ? 'hl' : ''}" data-a="openPhase" data-id="${ph.id}" style="--c:${tplOf(ph).color}">
+      <div class="row"><div class="phnum">${i + 1}</div><div class="sp"><div class="t">${esc(ph.name)}</div>
+      <div class="mu sm">${ph.weeks} ${ph.weeks === 1 ? 'semana' : 'semanas'} · ${ph.days.length} ${ph.days.length === 1 ? 'día' : 'días'}${p1 ? ` · ${p1.sets} × ${repsTxt(p1.repMin, p1.repMax)}` : ''}${rng}</div></div><span class="mu">›</span></div>
+      ${st ? `<div class="sm" style="margin:10px 0 0 46px;color:${i === (c && c.idx) ? 'var(--ac)' : 'var(--mu)'}">${st}</div>` : ''}</div>`;
+  });
+  h += `<button class="big" style="background:var(--s1)" data-a="addPhase" data-id="${p.id}">+ Agregar fase</button>
+    <p class="mu sm c" style="margin-top:14px">Cada fase nueva copia los días de la anterior: después cambiás lo que quieras (ejercicios, repeticiones, descansos).</p>`;
+  return h;
+}
+/* ---------- Fase ---------- */
+function vPhase() {
+  const f = findPhase(R.id);
+  if (!f) { R.view = 'train'; return vTrain(); }
+  const { prog, ph, idx } = f, c = prog.active ? progCtx(prog) : null, isCur = c && c.idx === idx, t = tplOf(ph);
+  const days = ph.days.map(id => S.routines.find(r => r.id === id)).filter(Boolean);
+  const d0 = days[0], it0 = d0 && d0.items.find(it => num(it.pct) > 0);
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button><span class="sp"></span><button class="sm" data-a="phaseMenu" data-id="${ph.id}" aria-label="Opciones">•••</button></div>
+    <div class="kicker">${esc(prog.name)} · Fase ${idx + 1}</div><h1 style="margin-top:6px">${esc(ph.name)}</h1>
+    <div class="row" style="gap:8px;flex-wrap:wrap;margin:-6px 0 16px">${phaseChip({ ...ph, name: t.name })}${isCur ? `<span class="badge ac">${c.done ? 'Terminada' : `Actual · semana ${c.w} de ${ph.weeks}`}</span>` : ''}</div>`;
+  if (!isCur) h += `<button class="big pri" style="margin:0 0 10px" data-a="phStart" data-id="${ph.id}">Empezar esta fase ahora</button>`;
+  h += `<div class="card"><label class="f" style="margin-top:0"><span>Nombre</span><input data-f="ph" data-k="name" data-id="${ph.id}" value="${esc(ph.name)}"></label>
+    <div class="row f"><span class="sp" style="font-size:15px">Semanas</span><div class="mini">
+      <button data-a="phWeeks" data-id="${ph.id}" data-d="-1" ${ph.weeks <= 1 ? 'disabled' : ''}>−</button><b>${ph.weeks}</b><button data-a="phWeeks" data-id="${ph.id}" data-d="1">+</button></div></div>
+    <label class="f"><span>Progresión automática (intensidad por semana)</span><select data-f="ph" data-k="step" data-id="${ph.id}">${[0, 1, 1.5, 2, 2.5, 3, 4, 5].map(v => `<option value="${v}" ${v == ph.step ? 'selected' : ''}>${v ? '+' + fmtNum(v) + '% por semana' : 'Sin progresión automática'}</option>`).join('')}</select></label>
+    <button class="toggle ${ph.deload ? 'on' : ''}" data-a="phDeload" data-id="${ph.id}"><span class="sp"><b>Última semana de descarga</b><br><span class="mu sm">Más liviana para recuperarte antes de la próxima fase</span></span><span class="sw"><i></i></span></button>
+    <button class="big" style="margin-top:12px" data-a="tplPick" data-id="${ph.id}" data-k="apply">Aplicar valores de una plantilla</button></div>`;
+  // semana por semana
+  h += `<h2>Semana por semana</h2><div class="card wtab"><div class="wt-h mu"><span>Semana</span><span>Intensidad</span><span>Series</span></div>`;
+  for (let w = 1; w <= ph.weeks; w++) {
+    const wp = weekParams(ph, w), o = (ph.wk || {})[w] || {}, res = it0 ? prescribe(it0, ph, w).pct : null;
+    h += `<div class="wt-r ${isCur && c.wEff === w ? 'cur' : ''}"><span><b>${w}</b>${wp.deload ? ' <span class="badge" style="font-size:10.5px">descarga</span>' : ''}</span>
+      <span class="row" style="gap:6px"><input inputmode="decimal" data-f="phw" data-k="dp" data-w="${w}" data-id="${ph.id}" value="${o.dp === undefined || o.dp === '' ? '' : o.dp}" placeholder="${wp.auto >= 0 ? '+' : ''}${fmtNum(wp.auto)}%">${res ? `<span class="mu sm">${fmtNum(res)}%</span>` : ''}</span>
+      <span><select data-f="phw" data-k="ds" data-w="${w}" data-id="${ph.id}">${[-2, -1, 0, 1, 2].map(v => `<option value="${v}" ${v === wp.ds ? 'selected' : ''}>${v > 0 ? '+' + v : v === 0 ? '=' : v}</option>`).join('')}</select></span></div>`;
+  }
+  h += `<p class="mu sm" style="margin:10px 0 0">En gris, lo que calcula la regla automática. Escribí un valor para cambiar una semana puntual (se suma al % de cada ejercicio)${it0 ? `; a la derecha, cómo queda “${esc((exById(it0.exerciseId) || {}).name || '')}”` : ''}.</p></div>`;
+  // días
+  h += `<h2>Días</h2>`;
+  if (!days.length) h += `<div class="card mu">Todavía no hay días en esta fase.</div>`;
+  days.forEach((r, k) => {
+    h += `<div class="card clickable" data-a="editRoutine" data-id="${r.id}"><div class="row"><div class="sp"><div class="kicker" style="font-size:11px">Día ${k + 1}</div><div class="t" style="margin-top:2px">${esc(r.name)}</div>
+      <div class="mu sm">${r.items.length} ejercicios · ${rxSummary(r, ph, isCur ? c.wEff : 1)}</div></div><span class="mu">›</span></div></div>`;
+  });
+  h += `<button class="big" style="background:var(--s1)" data-a="newDay" data-id="${ph.id}">+ Agregar día</button>`;
+  return h;
+}
+function tplListHtml(mode, id) {
+  return Object.keys(TPL).map(k => { const t = TPL[k];
+    return `<button class="pick tpl" data-a="tplUse" data-k="${k}" data-m="${mode}" data-id="${id}" style="--c:${t.color}"><i></i><span class="sp"><b>${t.name}</b>
+      <span class="mu sm" style="display:block">${t.sets ? `${t.weeks} sem · ${t.sets} × ${t.repMin}–${t.repMax} · ${t.pct}% · RIR ${t.rir} · descanso ${fmtRest(t.rest)}` : 'Sin valores predefinidos'}</span>
+      <span class="mu sm" style="display:block;margin-top:4px">${t.desc}</span></span></button>`; }).join('');
+}
 function vEdit() {
   const d = draft;
-  let h = `<div class="head"><button class="ghost" data-a="cancelEdit">Cancelar</button><div class="sp t c">${d._new ? 'Nueva rutina' : 'Editar rutina'}</div><button class="pri" data-a="saveEdit">Guardar</button></div>
+  let h = `<div class="head"><button class="ghost" data-a="cancelEdit">Cancelar</button><div class="sp t c">${d.phaseId ? (d._new ? 'Nuevo día' : 'Editar día') : d._new ? 'Nueva rutina' : 'Editar rutina'}</div><button class="pri" data-a="saveEdit">Guardar</button></div>
   <label class="f"><span>Nombre</span><input data-f="dname" value="${esc(d.name)}" placeholder="Ej: Push"></label>
   <label class="f"><span>Descripción (opcional)</span><textarea data-f="ddesc">${esc(d.desc)}</textarea></label>
+  ${d.phaseId && findPhase(d.phaseId) ? `<div class="note" style="margin-top:0">Fase “${esc(findPhase(d.phaseId).ph.name)}”: estos son los valores de la semana 1. La progresión semanal de la fase se aplica sola. <button class="link" style="padding:0;font-size:13px" data-a="rxInfo">¿Qué son % y RIR?</button></div>` : ''}
   <h2>Ejercicios · en este orden te va a guiar</h2>`;
   if (!d.items.length) h += `<div class="card mu">Sin ejercicios todavía.</div>`;
   d.items.forEach((it, i) => {
@@ -1071,8 +1316,12 @@ function vEdit() {
         <label><span>Reps máx.</span><input inputmode="numeric" data-f="it" data-k="repMax" data-i="${i}" value="${it.repMax}"></label>
         <label><span>Descanso</span><select data-f="it" data-k="rest" data-i="${i}">${RESTS.map(v => `<option value="${v}" ${v == it.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>
       </div>
-      <div class="row" style="margin-top:8px;gap:8px"><input inputmode="decimal" data-f="it" data-k="startW" data-i="${i}" value="${esc(fmtNum(it.startW))}" placeholder="Peso ref." style="width:96px;flex:none">
-      <input data-f="it" data-k="notes" data-i="${i}" value="${esc(it.notes)}" placeholder="Notas: agarre, asiento, técnica…"></div></div>`;
+      <div class="grid4" style="grid-template-columns:repeat(3,1fr)">
+        <label><span>% del máx.</span><input inputmode="decimal" data-f="it" data-k="pct" data-i="${i}" value="${esc(it.pct ?? '')}" placeholder="—"></label>
+        <label><span>RIR</span><select data-f="it" data-k="rir" data-i="${i}"><option value="">—</option>${[0, 1, 2, 3, 4].map(v => `<option value="${v}" ${it.rir === v ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label><span>Peso ref.</span><input inputmode="decimal" data-f="it" data-k="startW" data-i="${i}" value="${esc(fmtNum(it.startW))}" placeholder="—"></label>
+      </div>
+      <input data-f="it" data-k="notes" data-i="${i}" value="${esc(it.notes)}" placeholder="Notas: agarre, asiento, técnica…" style="margin-top:8px"></div>`;
   });
   h += `<button class="big" style="background:var(--s1)" data-a="pickForRoutine">+ Añadir ejercicio</button>`;
   return h;
@@ -1144,17 +1393,26 @@ function ensureCur(a) {
   if (a.cur == null || a.cur >= a.exercises.length || a.cur < 0) { a.cur = a.exercises.findIndex(pending); if (a.cur < 0) a.cur = 0; }
 }
 function sug(e, j, last) {
-  const step = S.settings.step;
-  let w = '', r = e.repMin, hint = '';
-  if (last) {
+  const step = S.settings.step, target = e.rir ?? 2;
+  let w = '', r = e.repMin, hint = '', adj = 0;
+  const e1 = e.pct ? curE1(e.exerciseId, S.active ? S.active.start : Infinity) : 0;
+  if (e.pct && e1) {
+    w = roundTo(e1 * e.pct / 100, step);
+    hint = `${fmtNum(e.pct)}% de tu máximo estimado (${Math.round(e1)} ${unit()})${e.rir != null ? ` · terminá con ${e.rir} ${e.rir === 1 ? 'repetición' : 'repeticiones'} en reserva` : ''}`;
+  } else if (last) {
     const ls = last.sets[j] || last.sets[last.sets.length - 1];
     const allTop = last.sets.length >= e.plannedSets && last.sets.every(s => s.r >= e.repMax);
     if (allTop && ls.w > 0) { w = r2(ls.w + step); r = e.repMin; hint = `Llegaste a ${e.repMax} reps en todas: hoy subí ${fmtNum(step)} ${unit()}`; }
     else if (ls.r < e.repMax) { w = ls.w; r = Math.min(e.repMax, ls.r + 1); hint = 'Objetivo: una repetición más que la última vez'; }
     else { w = ls.w; r = ls.r; hint = 'Objetivo: igualar la última vez'; }
-  } else if (e.startW != null && e.startW !== '') { w = e.startW; hint = 'Peso de referencia de tu planilla'; }
-  if (j > 0 && e.sets[j - 1].done) { w = e.sets[j - 1].w; if (!last) r = e.sets[j - 1].r; }
-  return { w, r, hint };
+  } else if (e.startW != null && e.startW !== '') { w = e.startW; hint = 'Peso de referencia'; }
+  else if (e.pct || e.rir != null) hint = `Elegí un peso con el que te queden ~${target} repeticiones en reserva. Con esta serie la app aprende tu máximo.`;
+  if (j > 0 && e.sets[j - 1].done) {
+    const p = e.sets[j - 1]; w = p.w; if (!last && !e.pct) r = p.r;
+    // ajuste según cuántas te sobraban en la serie anterior
+    if (p.rir != null && w > 0) { const d = p.rir - target; if (d >= 2) { adj = step; hint = `Te sobraban ${p.rir}: subí ${fmtNum(step)} ${unit()}`; } else if (d <= -2 || (p.rir === 0 && target >= 2)) { adj = -step; hint = `Llegaste justo: bajá ${fmtNum(step)} ${unit()}`; } w = r2(Math.max(0, w + adj)); }
+  }
+  return { w, r, hint, adj };
 }
 function curVals(e, j, g) { const s = e.sets[j]; return { w: s.w !== '' ? s.w : g.w, r: s.r !== '' ? s.r : g.r }; }
 function wkTotals(a) {
@@ -1195,6 +1453,8 @@ function vWorkout() {
   h += `<div class="exmeta kicker swapme">${i + 1} de ${a.exercises.length}${e.muscle ? ' · ' + esc(e.muscle) : ''}</div>
     <div class="exname clickable swapme" data-a="exHist">${esc(e.name)}</div>
     <div class="mu swapme">${e.plannedSets} × ${repsTxt(e.repMin, e.repMax)} reps${e.unilateral ? ' por lado' : ''} · descanso ${fmtRest(e.rest)}</div>`;
+  const rx = [a.wk ? `Semana ${a.wk.w} de ${a.wk.n}${a.wk.deload ? ' · descarga' : ''}` : '', e.pct ? fmtNum(e.pct) + '%' : '', e.rir != null ? 'RIR ' + e.rir : ''].filter(Boolean);
+  if (rx.length) h += `<div class="rx swapme">${rx.map(x => `<span>${x}</span>`).join('')}${e.pct || e.rir != null ? '<button class="rxi" data-a="rxInfo" aria-label="Qué significa">?</button>' : ''}</div>`;
   if (e.notes) h += `<div class="note">${esc(e.notes)}</div>`;
 
   if (e.skipped) {
@@ -1210,7 +1470,7 @@ function vWorkout() {
     h += `<div class="setcard swapme"><div class="row"><div class="setno sp">Serie ${j + 1} <span class="mu" style="font-weight:600">de ${e.sets.length}</span></div>
       ${!last && j === 0 ? '<span class="badge">Primera vez</span>' : ''}</div>`;
     if (last) h += `<div class="lastline">Última vez · ${last.sets.map(s => fmtNum(s.w) + '×' + s.r).join(' · ')}</div>`;
-    if (g.hint && j === 0) h += `<div class="hint">↗ <span class="sp">${esc(g.hint)}</span></div>`;
+    if (g.hint && (j === 0 || g.adj)) h += `<div class="hint">↗ <span class="sp">${esc(g.hint)}</span></div>`;
     h += `<div class="lbl">Peso · ${unit()}</div>
       <div class="stepper"><button data-a="step" data-k="w" data-d="-1" aria-label="Menos peso">−</button>
       <input inputmode="decimal" data-f="cw" value="${esc(fmtNum(v.w) || v.w)}" placeholder="0"><button data-a="step" data-k="w" data-d="1" aria-label="Más peso">+</button></div>
@@ -1231,23 +1491,27 @@ function centerPill() {
   if (c && p) c.scrollLeft = p.offsetLeft - c.clientWidth / 2 + p.clientWidth / 2;
 }
 function startSession(r) {
-  const exs = r ? r.items.map(it => mkWkEx(it.exerciseId, it.sets, it.repMin, it.repMax, it.rest, it.notes, it.startW)) : [];
-  S.active = { id: uid(), routineId: r ? r.id : null, name: r ? r.name : 'Sesión libre', start: Date.now(), exercises: exs, restEnd: 0, restTotal: 0, cur: 0 };
+  const f = r && r.phaseId ? findPhase(r.phaseId) : null, c = f && f.prog.active ? progCtx(f.prog) : null;
+  const ph = f ? f.ph : null, w = c && c.ph.id === ph.id ? c.wEff : 1;
+  const exs = r ? r.items.map(it => { const p = prescribe(it, ph, w); return mkWkEx(it.exerciseId, p.sets, p.repMin, p.repMax, p.rest, it.notes, it.startW, p.pct, p.rir); }) : [];
+  S.active = { id: uid(), routineId: r ? r.id : null, name: r ? r.name : 'Sesión libre', start: Date.now(), exercises: exs, restEnd: 0, restTotal: 0, cur: 0,
+    wk: ph ? { w, n: ph.weeks, deload: weekParams(ph, w).deload, ph: ph.name } : null };
   save(); go('workout');
 }
-function mkWkEx(exId, sets, repMin, repMax, rest, notes, startW) {
+function mkWkEx(exId, sets, repMin, repMax, rest, notes, startW, pct = null, rir = null) {
   const e = exById(exId) || { name: '(ejercicio)', muscle: '' };
-  return { id: uid(), exerciseId: exId, name: e.name, muscle: e.muscle, unilateral: !!e.unilateral, repMin, repMax, rest, notes: notes || '', startW: startW ?? null,
+  return { id: uid(), exerciseId: exId, name: e.name, muscle: e.muscle, unilateral: !!e.unilateral, repMin, repMax, rest, notes: notes || '', startW: startW ?? null, pct, rir,
     plannedSets: sets, skipped: false, sets: Array.from({ length: sets }, () => ({ w: '', r: '', done: false })) };
 }
 function finishSession() {
   const a = S.active, st0 = streakInfo().n;
   const exs = a.exercises.map(e => ({
     exerciseId: e.exerciseId, name: e.name, muscle: e.muscle, unilateral: e.unilateral,
-    sets: e.sets.filter(s => s.done).map(s => { const o = { w: num(s.w), r: Math.round(num(s.r)) }; if (s.pr) o.pr = true; return o; })
+    sets: e.sets.filter(s => s.done).map(s => { const o = { w: num(s.w), r: Math.round(num(s.r)) }; if (s.pr) o.pr = true; if (s.rir != null) o.rir = s.rir; return o; })
       .filter(s => Number.isFinite(s.w) && Number.isFinite(s.r) && s.r > 0)
   })).filter(e => e.sets.length);
   const sess = { id: a.id, routineId: a.routineId, name: a.name, start: a.start, end: Date.now(), exercises: exs };
+  if (a.wk) sess.phase = `${a.wk.ph} · semana ${a.wk.w}`;
   S.sessions.push(sess); S.sessions.sort((x, y) => x.start - y.start);
   S.active = null; save();
   fresh = sess.id; R.view = 'home'; go('session', sess.id); setTimeout(() => confetti(), 250); checkStreakUp(st0);
@@ -1286,6 +1550,12 @@ function nextInfo(a) {
   return { name: e.name, j, n: e.sets.length, w: v.w, r: v.r };
 }
 const RC = 2 * Math.PI * 120;
+function rirAsk(a) {
+  const ld = a.lastDone, e = ld && a.exercises[ld.i], s = e && e.sets[ld.j];
+  if (!s || !s.done) return '';
+  return `<div class="rirq"><div class="mu sm">¿Cuántas repeticiones más podías hacer?</div>
+    <div class="rirc">${[0, 1, 2, 3, 4].map(v => `<button class="${s.rir === v ? 'on' : ''}" data-a="rirSet" data-v="${v}">${v === 4 ? '4+' : v}</button>`).join('')}</div></div>`;
+}
 function renderRest() {
   const el = $('#rest'), a = S.active;
   if (R.view !== 'workout' || !a || !a.restEnd) { el.innerHTML = ''; return; }
@@ -1309,6 +1579,7 @@ function renderRest() {
     <div class="ring"><svg viewBox="0 0 260 260"><circle cx="130" cy="130" r="120" class="ring-bg"/>
     <circle cx="130" cy="130" r="120" class="ring-fg" style="stroke-dasharray:${RC};stroke-dashoffset:${off}"/></svg><div class="clock">${mmss(left)}</div></div>
     <div class="rbtns"><button data-a="restAdj" data-d="-15">−15 s</button><button data-a="restAdj" data-d="15">+15 s</button></div>
+    ${rirAsk(a)}
     ${nx ? `<div class="next"><div class="kicker" style="font-size:11px">Siguiente</div><div class="t" style="margin-top:4px">${esc(nx.name)}</div>
       <div class="mu sm">Serie ${nx.j + 1} de ${nx.n}${nx.w !== '' ? ' · ' + fmtNum(nx.w) + ' ' + unit() : ''} × ${nx.r} reps</div></div>` : ''}
     <button class="pri big cta" data-a="restSkip" style="margin-top:14px">Saltar descanso</button></div>`;
@@ -1653,7 +1924,7 @@ function vSession() {
   let h = `<div class="head"><button class="ghost" data-a="${isFresh ? 'tab' : 'back'}" data-v="home">${isFresh ? 'Cerrar' : '‹ Volver'}</button><span class="sp"></span>
     <button class="sm" data-a="share" data-id="${s.id}" aria-label="Compartir">${SHARE_ICO}</button><button class="sm" data-a="editSession" data-id="${s.id}">Editar</button></div>`;
   if (isFresh) h += `<div class="fin" style="padding-top:6px"><div class="emoji">🎉</div><div class="exname">¡Buen entrenamiento${uname() ? ', ' + esc(uname()) : ''}!</div><div class="mu">${esc(s.name)}</div></div>`;
-  h += `<div class="kicker" style="${isFresh ? 'text-align:center;margin-top:10px' : ''}">${cap(fmtDate(s.start))} · ${fmtTime(s.start)}</div>
+  h += `<div class="kicker" style="${isFresh ? 'text-align:center;margin-top:10px' : ''}">${cap(fmtDate(s.start))} · ${fmtTime(s.start)}${s.phase ? ' · ' + esc(s.phase) : ''}</div>
     ${isFresh ? '' : `<h1 style="margin-top:6px">${esc(s.name)}</h1>`}
     <div class="tiles" style="margin-top:16px"><div class="tile"><b>${fmtDur(s.end - s.start)}</b><span>Duración</span></div>
     <div class="tile"><b>${sessSets(s)}</b><span>Series</span></div><div class="tile"><b>${fmtBig(sessVol(s))}</b><span>Volumen (${unit()})</span></div></div>`;
@@ -1725,7 +1996,7 @@ $('#impf').addEventListener('change', async ev => {
     const d = JSON.parse(await f.text());
     if (!Array.isArray(d.routines) || !Array.isArray(d.sessions) || !Array.isArray(d.exercises)) throw new Error('formato');
     ask('Restaurar respaldo', `El respaldo tiene ${d.routines.length} rutinas y ${d.sessions.length} entrenamientos. Va a reemplazar todo lo que hay ahora en este dispositivo.`, 'Restaurar', () => {
-      S = importSheet(migrate(d)); save(); go('home'); toast('Respaldo restaurado');
+      S = migratePrograms(importSheet(migrate(d))); save(); go('home'); toast('Respaldo restaurado');
     }, true);
   } catch (e) { toast('Ese archivo no es un respaldo válido'); }
 });
@@ -1798,7 +2069,7 @@ const A = {
   goalMenu: () => {
     const g = +S.settings.weekGoal || 0;
     openModal(`<div class="t" style="font-size:19px">Objetivo semanal</div><p class="mu sm">Cuántos entrenamientos por semana necesitás para sumar 🔥 a tu racha.</p>
-      ${[0, 1, 2, 3, 4, 5, 6, 7].map(k => `<button class="pick" data-a="setGoal" data-k="${k}"><span class="sp">${k ? k + ' por semana' : `Automático · ${autoGoal()} (una por rutina)`}</span>${g === k ? '<span class="up">✓</span>' : ''}</button>`).join('')}`);
+      ${[0, 1, 2, 3, 4, 5, 6, 7].map(k => `<button class="pick" data-a="setGoal" data-k="${k}"><span class="sp">${k ? k + ' por semana' : `Automático · ${autoGoal()} (uno por día del plan)`}</span>${g === k ? '<span class="up">✓</span>' : ''}</button>`).join('')}`);
   },
   setGoal: d => { S.settings.weekGoal = +d.k; S.settings.u = Date.now(); closeModal(); save(); render(); },
   goWelcome: () => { wmode = 'signup'; go('welcome'); },
@@ -1951,8 +2222,118 @@ const A = {
       }).join('')}
       <button class="big" data-a="startFree">Sesión libre</button>`);
   },
+  dismissProgNew: () => { S.progNew = false; save(false); render(); },
+  openProgram: d => { closeModal(); go('program', d.id); },
+  openPhase: d => { closeModal(); go('phase', d.id); },
+  newProgram: () => {
+    const c = progCtx();
+    openModal(`<div class="t" style="font-size:19px">Nuevo programa</div>
+      <label class="f"><span>Nombre</span><input id="np_n" placeholder="Ej: Plan verano 2027" value=""></label>
+      ${c && c.ph.days.length ? `<button class="toggle on" id="np_c" data-a="npCopy"><span class="sp"><b>Copiar los días de “${esc(c.ph.name)}”</b><br><span class="mu sm">Arrancás con los mismos ejercicios y después los cambiás</span></span><span class="sw"><i></i></span></button>` : ''}
+      <div class="mu sm" style="margin:14px 0 4px">Elegí cómo empieza la primera fase:</div>${tplListHtml('newProg', '')}
+      <button class="big ghost" data-a="closeModal">Cancelar</button>`);
+  },
+  npCopy: (d, el) => el.classList.toggle('on'),
+  addPhase: d => openModal(`<div class="row"><div class="t sp" style="font-size:19px">Nueva fase</div><button class="ghost" data-a="closeModal">Cerrar</button></div>
+      <p class="mu sm">Copia los días de la última fase y les aplica los valores de la plantilla.</p>${tplListHtml('addPhase', d.id)}`),
+  tplPick: d => openModal(`<div class="row"><div class="t sp" style="font-size:19px">Aplicar plantilla</div><button class="ghost" data-a="closeModal">Cerrar</button></div>
+      <p class="mu sm">Cambia semanas, progresión y los valores (series, repeticiones, %, RIR y descanso) de todos los ejercicios de esta fase.</p>${tplListHtml('apply', d.id)}`),
+  tplUse: d => {
+    const k = d.k, t = TPL[k];
+    if (d.m === 'apply') {
+      const f = findPhase(d.id); if (!f) return;
+      ask(`Aplicar “${t.name}”`, 'Se reemplazan los valores de todos los ejercicios de esta fase. Los ejercicios en sí no cambian.', 'Aplicar', () => {
+        if (f.ph.name === tplOf(f.ph).name) f.ph.name = t.name;
+        applyTpl(f.ph, k); touch(f.prog); save(); render(); toast('Plantilla aplicada');
+      });
+      return;
+    }
+    if (d.m === 'addPhase') {
+      const p = S.programs.find(x => x.id === d.id); if (!p) return;
+      const prev = p.phases[p.phases.length - 1], ph = { id: uid(), name: t.name, type: k, weeks: t.weeks, step: t.step, deload: t.deload, wk: {}, days: [] };
+      if (prev) prev.days.forEach(id => { const r = S.routines.find(x => x.id === id); if (r) { const cp = copyDay(r, ph.id); S.routines.push(cp); ph.days.push(cp.id); } });
+      p.phases.push(ph); applyTpl(ph, k); if (!p.cur) p.cur = { pid: ph.id, ws: weekStart() };
+      touch(p); closeModal(); save(); go('phase', ph.id); toast('Fase agregada');
+      return;
+    }
+    // programa nuevo
+    const name = ($('#np_n') && $('#np_n').value.trim()) || 'Mi programa', cpy = $('#np_c') && $('#np_c').classList.contains('on'), c = progCtx();
+    const ph = { id: uid(), name: t.name, type: k, weeks: t.weeks, step: t.step, deload: t.deload, wk: {}, days: [] };
+    if (cpy && c) c.ph.days.forEach(id => { const r = S.routines.find(x => x.id === id); if (r) { const cp = copyDay(r, ph.id); S.routines.push(cp); ph.days.push(cp.id); } });
+    applyTpl(ph, k);
+    const p = { id: uid(), name, active: false, phases: [ph], cur: { pid: ph.id, ws: weekStart() }, u: Date.now() };
+    S.programs.push(p);
+    if (!activeProg()) p.active = true;
+    closeModal(); save(); go('program', p.id); toast('Programa creado');
+  },
+  activateProg: d => {
+    S.programs.forEach(p => { if (p.active) { p.active = false; touch(p); } });
+    const p = S.programs.find(x => x.id === d.id); p.active = true; p.cur = { pid: (p.phases[0] || {}).id, ws: weekStart() }; touch(p);
+    closeModal(); save(); render(); toast('Programa activado: empieza esta semana');
+  },
+  progMenu: d => {
+    const p = S.programs.find(x => x.id === d.id);
+    openModal(`<div class="t" style="font-size:19px">${esc(p.name)}</div>
+      <label class="f"><span>Nombre</span><input data-f="pg" data-id="${p.id}" value="${esc(p.name)}"></label>
+      ${p.active ? '' : `<button class="big pri" data-a="activateProg" data-id="${p.id}">Usar este programa</button>`}
+      <button class="big ghost danger" data-a="delProg" data-id="${p.id}">Eliminar programa</button>
+      <button class="big ghost" data-a="closeModalRender">Listo</button>`);
+  },
+  closeModalRender: () => { closeModal(); render(); },
+  delProg: d => ask('Eliminar programa', 'Se borran sus fases y días. Tus entrenamientos pasados quedan en el historial.', 'Eliminar', () => {
+    const p = S.programs.find(x => x.id === d.id);
+    p.phases.forEach(ph => ph.days.forEach(id => { S.routines = S.routines.filter(r => r.id !== id); S.deleted.push(id); }));
+    S.programs = S.programs.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); go('train');
+  }, true),
+  phStart: d => {
+    const f = findPhase(d.id); if (!f) return;
+    S.programs.forEach(p => { if (p.active && p !== f.prog) { p.active = false; touch(p); } });
+    f.prog.active = true; f.prog.cur = { pid: f.ph.id, ws: weekStart() }; touch(f.prog); save(); render(); toast(`${f.ph.name}: semana 1`);
+  },
+  phWeeks: d => { const f = findPhase(d.id); if (!f) return; f.ph.weeks = Math.max(1, Math.min(16, f.ph.weeks + (+d.d))); touch(f.prog); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  phDeload: d => { const f = findPhase(d.id); if (!f) return; f.ph.deload = !f.ph.deload; touch(f.prog); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  phaseMenu: d => {
+    const f = findPhase(d.id), n = f.prog.phases.length;
+    openModal(`<div class="t" style="font-size:19px">${esc(f.ph.name)}</div>
+      <button class="big" data-a="phDup" data-id="${f.ph.id}">Duplicar fase</button>
+      <div class="row" style="gap:8px"><button class="big sp" data-a="phMove" data-id="${f.ph.id}" data-d="-1" ${f.idx ? '' : 'disabled'}>Antes</button><button class="big sp" data-a="phMove" data-id="${f.ph.id}" data-d="1" ${f.idx < n - 1 ? '' : 'disabled'}>Después</button></div>
+      <button class="big ghost danger" data-a="phDel" data-id="${f.ph.id}">Eliminar fase</button>`);
+  },
+  phDup: d => {
+    const f = findPhase(d.id), ph = JSON.parse(JSON.stringify(f.ph)); ph.id = uid(); ph.name += ' (copia)';
+    ph.days = f.ph.days.map(id => S.routines.find(r => r.id === id)).filter(Boolean).map(r => { const cp = copyDay(r, ph.id); S.routines.push(cp); return cp.id; });
+    f.prog.phases.splice(f.idx + 1, 0, ph); touch(f.prog); closeModal(); save(); go('phase', ph.id);
+  },
+  phMove: d => { const f = findPhase(d.id), a = f.prog.phases, j = f.idx + (+d.d); if (j < 0 || j >= a.length) return; [a[f.idx], a[j]] = [a[j], a[f.idx]]; touch(f.prog); closeModal(); save(); render(); },
+  phDel: d => ask('Eliminar fase', 'Se borran sus días. Tus entrenamientos pasados quedan en el historial.', 'Eliminar', () => {
+    const f = findPhase(d.id); f.ph.days.forEach(id => { S.routines = S.routines.filter(r => r.id !== id); S.deleted.push(id); });
+    f.prog.phases.splice(f.idx, 1);
+    if (f.prog.cur && f.prog.cur.pid === f.ph.id) f.prog.cur = f.prog.phases.length ? { pid: f.prog.phases[Math.max(0, f.idx - 1)].id, ws: weekStart() } : null;
+    touch(f.prog); save(); go('program', f.prog.id);
+  }, true),
+  newDay: d => { const f = findPhase(d.id); draft = { id: uid(), name: `Día ${f.ph.days.length + 1}`, desc: '', days: [], archived: false, items: [], _new: true, phaseId: f.ph.id }; go('edit'); },
+  dayDel: d => ask('Quitar día', 'Se quita de esta fase. Tus entrenamientos pasados quedan en el historial.', 'Quitar', () => {
+    const r = S.routines.find(x => x.id === d.id), f = r && findPhase(r.phaseId);
+    if (f) { f.ph.days = f.ph.days.filter(id => id !== d.id); touch(f.prog); }
+    S.routines = S.routines.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
+  }, true),
+  advancePhase: () => { const c = progCtx(); if (!c || !c.next) return; c.prog.cur = { pid: c.next.id, ws: weekStart() }; touch(c.prog); save(); render(); toast(`¡Arranca ${c.next.name}! Semana 1`); confetti(80); },
+  extendPhase: () => { const c = progCtx(); if (!c) return; c.ph.weeks = Math.max(c.ph.weeks, c.w); touch(c.prog); save(); render(); toast(`${c.ph.name}: una semana más`); },
+  rxInfo: () => openModal(`<div class="t" style="font-size:20px">% y RIR, en simple</div>
+    <p><b>% del máximo</b> · Tu “máximo” (1RM) es el peso que podrías levantar una sola vez. Un 75% significa usar el 75% de ese peso. No hace falta que lo pruebes: la app lo estima con lo que vas registrando y te calcula los kilos de cada semana.</p>
+    <p><b>RIR</b> (repeticiones en reserva) · Cuántas repeticiones más podrías haber hecho al terminar la serie. RIR 2 = terminás sintiendo que te quedaban 2. Cuanto más bajo, más cerca del fallo.</p>
+    <p><b>Cómo te ayuda la app</b> · Después de cada serie te pregunta cuántas te sobraban. Si te sobran 2 o más de lo indicado, te sugiere subir el peso en la próxima serie; si llegaste justo, bajarlo. Con eso también ajusta tu máximo para la semana siguiente.</p>
+    <button class="big pri" data-a="closeModal">Entendido</button>`),
+  rirSet: d => {
+    const a = S.active, ld = a && a.lastDone, e = ld && a.exercises[ld.i], s = e && e.sets[ld.j]; if (!s) return;
+    s.rir = +d.v; const target = e.rir ?? 2, diff = s.rir - target, nxt = e.sets.find(x => !x.done), st = fmtNum(S.settings.step);
+    if (nxt) toast(diff >= 2 ? `Próxima serie: +${st} ${unit()} 💪` : diff <= -2 || (s.rir === 0 && target >= 2) ? `Próxima serie: −${st} ${unit()}` : 'Perfecto, mantené el peso');
+    else toast('Anotado');
+    save(); $('#rest').innerHTML = ''; const y = window.scrollY; render(); window.scrollTo(0, y);
+  },
   routineMenu: d => {
-    const act = S.routines.filter(r => !r.archived), i = act.findIndex(r => r.id === d.id), r = act[i];
+    const r0 = S.routines.find(r => r.id === d.id), f0 = r0 && r0.phaseId ? findPhase(r0.phaseId) : null;
+    const act = f0 ? f0.ph.days.map(id => S.routines.find(x => x.id === id)).filter(Boolean) : S.routines.filter(r => !r.archived && !r.phaseId), i = act.findIndex(r => r.id === d.id), r = act[i];
     openModal(`<div class="t" style="font-size:19px">${esc(r.name)}</div>
       <div class="mu sm" style="margin:4px 0 8px">${r.items.map(it => esc((exById(it.exerciseId) || {}).name || '')).join(' · ')}</div>
       <button class="big pri" data-a="start" data-id="${r.id}">Empezar</button>
@@ -1960,11 +2341,11 @@ const A = {
       <button class="big" data-a="dupRoutine" data-id="${r.id}">Duplicar</button>
       <div class="row" style="gap:8px"><button class="big sp" data-a="moveRoutine" data-id="${r.id}" data-d="-1" ${i ? '' : 'disabled'}>Subir</button>
       <button class="big sp" data-a="moveRoutine" data-id="${r.id}" data-d="1" ${i < act.length - 1 ? '' : 'disabled'}>Bajar</button></div>
-      <button class="big ghost danger" data-a="archRoutine" data-id="${r.id}">Archivar</button>`);
+      ${f0 ? `<button class="big ghost danger" data-a="dayDel" data-id="${r.id}">Quitar de la fase</button>` : `<button class="big ghost danger" data-a="archRoutine" data-id="${r.id}">Archivar</button>`}`);
   },
   newRoutine: () => { draft = { id: uid(), name: '', desc: '', days: [], archived: false, items: [], _new: true }; go('edit'); },
   editRoutine: d => { closeModal(); const r = S.routines.find(x => x.id === d.id); if (!r) return; draft = JSON.parse(JSON.stringify(r)); go('edit'); },
-  cancelEdit: () => { draft = null; go('train'); },
+  cancelEdit: () => { const ph = draft && draft.phaseId; draft = null; ph && findPhase(ph) ? go('phase', ph) : go('train'); },
   saveEdit: () => {
     const d = draft;
     if (!d.name.trim()) { toast('Poné un nombre a la rutina'); return; }
@@ -1975,23 +2356,34 @@ const A = {
       it.repMax = Math.max(it.repMin, parseInt(it.repMax) || it.repMin);
       it.rest = parseInt(it.rest) || S.settings.rest;
       const sw = num(it.startW); if (Number.isFinite(sw) && sw >= 0) it.startW = sw; else delete it.startW;
+      const pc = num(it.pct); it.pct = Number.isFinite(pc) && pc > 0 ? Math.min(100, pc) : null;
+      it.rir = it.rir === '' || it.rir === null || it.rir === undefined ? null : +it.rir;
     });
     const isNew = d._new; delete d._new; d.u = Date.now();
     if (isNew) S.routines.push(d); else S.routines = S.routines.map(r => r.id === d.id ? d : r);
-    draft = null; save(); go('train'); toast('Rutina guardada');
+    const fph = d.phaseId ? findPhase(d.phaseId) : null;
+    if (isNew && fph) { fph.ph.days.push(d.id); touch(fph.prog); }
+    draft = null; save(); fph ? go('phase', fph.ph.id) : go('train'); toast('Guardado');
   },
   toggleDay: d => { const k = +d.k; draft.days = draft.days.includes(k) ? draft.days.filter(x => x !== k) : [...draft.days, k]; render(); },
   itMove: d => { const i = +d.i, j = i + (+d.d), it = draft.items; if (j < 0 || j >= it.length) return; [it[i], it[j]] = [it[j], it[i]]; render(); },
   itDel: d => { draft.items.splice(+d.i, 1); render(); },
-  pickForRoutine: () => openPicker(id => { draft.items.push({ id: uid(), exerciseId: id, sets: 3, repMin: 8, repMax: 10, rest: S.settings.rest, notes: '' }); render(); }),
+  pickForRoutine: () => openPicker(id => {
+    const f = draft.phaseId && findPhase(draft.phaseId), t = f ? tplOf(f.ph) : {};
+    draft.items.push({ id: uid(), exerciseId: id, sets: t.sets || 3, repMin: t.repMin || 8, repMax: t.repMax || 10, rest: t.rest || S.settings.rest, pct: t.pct ?? null, rir: t.rir ?? null, notes: '' }); render();
+  }),
   dupRoutine: d => {
     closeModal();
     const i = S.routines.findIndex(r => r.id === d.id); const c = JSON.parse(JSON.stringify(S.routines[i]));
     c.id = uid(); c.name += ' (copia)'; c.days = []; c.u = Date.now(); c.items.forEach(it => it.id = uid());
-    S.routines.splice(i + 1, 0, c); save(); render(); toast('Rutina duplicada');
+    S.routines.splice(i + 1, 0, c);
+    const fd = c.phaseId ? findPhase(c.phaseId) : null; if (fd) { fd.ph.days.splice(fd.ph.days.indexOf(d.id) + 1, 0, c.id); touch(fd.prog); }
+    save(); render(); toast('Duplicada');
   },
   moveRoutine: d => {
     closeModal();
+    const rr0 = S.routines.find(r => r.id === d.id), fp = rr0 && rr0.phaseId ? findPhase(rr0.phaseId) : null;
+    if (fp) { const ds = fp.ph.days, i = ds.indexOf(d.id), j = i + (+d.d); if (i < 0 || j < 0 || j >= ds.length) return; [ds[i], ds[j]] = [ds[j], ds[i]]; touch(fp.prog); save(); render(); return; }
     const act = S.routines.filter(r => !r.archived), arc = S.routines.filter(r => r.archived);
     const i = act.findIndex(r => r.id === d.id), j = i + (+d.d);
     if (j < 0 || j >= act.length) return;
@@ -2035,13 +2427,13 @@ const A = {
     s.pr = b.any && w > 0 && (e1rm(w, s.r) > bestE + 0.01 || w > bestW);
     if (!s.pr) delete s.pr;
     unlockAudio();
-    justDone = { id: e.id, k: j };
+    justDone = { id: e.id, k: j }; a.lastDone = { i: a.cur, j };
     if (s.pr) { toast('🏆 ¡Nuevo récord!', true); beep([660, 880, 1320]); confetti(70); }
     if (!e.sets.some(x => !x.done)) { const nx = nextPending(a, a.cur); if (nx >= 0) a.cur = nx; }
     if (a.exercises.some(pending)) { a.restEnd = Date.now() + e.rest * 1000; a.restTotal = e.rest; $('#rest').innerHTML = ''; }
     peek = false; wkRender();
   },
-  undoSet: d => { const a = S.active, e = curEx(), s = e.sets[+d.k]; s.done = false; delete s.pr; a.restEnd = 0; peek = false; wkRender(); },
+  undoSet: d => { const a = S.active, e = curEx(), s = e.sets[+d.k]; s.done = false; delete s.pr; delete s.rir; a.restEnd = 0; a.lastDone = null; peek = false; wkRender(); },
   addSet: () => { const e = curEx(); e.sets.push({ w: '', r: '', done: false }); e.skipped = false; peek = false; wkRender(); },
   jump: d => { const a = S.active; closeModal(); a.cur = +d.i; peek = true; wkRender(); },
   nextEx: () => {
@@ -2134,7 +2526,7 @@ const A = {
   export: () => doExport(),
   import: () => $('#impf').click(),
   wipe: () => ask('Borrar todos los datos', 'Se eliminan rutinas, ejercicios propios y todo el historial de este dispositivo. Exportá un respaldo antes si querés conservarlos.', 'Borrar todo', () => {
-    S = importSheet(migrate(seed())); save(); go('home'); toast('Datos borrados');
+    S = migratePrograms(importSheet(migrate(seed()))); save(); go('home'); toast('Datos borrados');
   }, true),
 };
 
@@ -2157,7 +2549,10 @@ function onField(e) {
   }
   else if (f === 'dname') draft.name = v;
   else if (f === 'ddesc') draft.desc = v;
-  else if (f === 'it') draft.items[+d.i][d.k] = (d.k === 'notes' || d.k === 'startW') ? v : (d.k === 'rest' ? +v : v);
+  else if (f === 'it') draft.items[+d.i][d.k] = ['notes', 'startW', 'pct'].includes(d.k) ? v : d.k === 'rest' ? +v : d.k === 'rir' ? (v === '' ? null : +v) : v;
+  else if (f === 'pg') { const p = S.programs.find(x => x.id === d.id); if (p) { p.name = v; touch(p); save(); } }
+  else if (f === 'ph') { const fp = findPhase(d.id); if (fp) { fp.ph[d.k] = d.k === 'step' ? +v : v; touch(fp.prog); save(); if (d.k === 'step') { const y = window.scrollY; render(); window.scrollTo(0, y); } } }
+  else if (f === 'phw') { const fp = findPhase(d.id); if (fp) { const wk = fp.ph.wk = fp.ph.wk || {}; const o = wk[d.w] = wk[d.w] || {}; const n = num(v); o[d.k] = v === '' || !Number.isFinite(n) ? '' : n; touch(fp.prog); save(); } }
   else if (f === 'pq') { pickQ = v; $('#plist').innerHTML = pickerList(); }
   else if (f === 'hs') { const s = S.sessions.find(x => x.id === R.id); const n = num(v); if (Number.isFinite(n) && n >= 0) { s.exercises[+d.i].sets[+d.j][d.k] = d.k === 'r' ? Math.round(n) : n; s.u = Date.now(); save(); } }
   else if (f === 'exq') { exQ = v; const l = $('#exlist'); if (l) l.innerHTML = exListHtml(); }
