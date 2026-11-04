@@ -447,6 +447,24 @@ button.tile{color:inherit;font:inherit}
 .ssbadge{display:inline-block;margin:10px 0 2px;padding:6px 11px;border-radius:99px;background:var(--acd);color:var(--ac);font-size:12.5px;font-weight:650}
 .cbadge.stall,.cb.stall{color:#ff7ab6}.cbadge.stall{background:rgba(255,122,182,.12)}
 .cbadge.deload,.cb.deload{color:#7fd3ff}.cbadge.deload{background:rgba(127,211,255,.12)}
+.wknav{margin:0 0 14px;background:var(--s1);border-radius:16px;padding:6px}
+.wknav button{font-size:22px;padding:6px 14px}
+.mrow{padding:12px 0;border-bottom:1px solid var(--ln)}.mrow:last-child{border-bottom:none}
+.mtrack{position:relative;height:10px;border-radius:9px;background:var(--s2);margin-top:8px;overflow:hidden}
+.mtrack .zone{position:absolute;top:0;bottom:0;background:rgba(184,242,107,.16)}
+.mtrack .fill{position:absolute;left:0;top:0;bottom:0;border-radius:9px;background:#8a8a94}
+.mtrack .fill.ok{background:var(--ac)}.mtrack .fill.alto{background:#ffb347}.mtrack .fill.bajo{background:#ff7ab6}.mtrack .fill.pend{background:#7fd3ff}
+.mtrack .ptk{position:absolute;top:0;bottom:0;width:3px;margin-left:-1px;background:#fff;border-radius:2px}
+.mst{font-size:12px;font-weight:650;margin-top:6px;color:var(--mu)}
+.mst.ok{color:var(--ac)}.mst.alto{color:#ffb347}.mst.bajo{color:#ff7ab6}.mst.pend{color:#7fd3ff}
+.dist{display:flex;height:14px;border-radius:9px;overflow:hidden;gap:2px}
+.dleg{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:12px;font-size:13px;color:var(--mu)}
+.dleg span{display:inline-flex;align-items:center;gap:6px}.dleg b{color:var(--tx)}
+.dleg i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.mini{display:flex;gap:5px;height:34px;align-items:flex-end;margin-top:14px}
+.mini i{flex:1;height:100%;background:var(--s2);border-radius:5px;position:relative;overflow:hidden}
+.mini i b{position:absolute;left:0;right:0;bottom:0;background:#ff7ab6;border-radius:5px}
+.mini i.ok b{background:var(--ac)}.mini i.alto b{background:#ffb347}
 </style>
 </head>
 <body>
@@ -467,7 +485,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.5';
+const KEY = 'entreno.v1', VERSION = '6.6';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1022,6 +1040,98 @@ function lineChart(points, suffix) {
     ${points.length > 1 ? `<text x="${W - pr}" y="${H - 5}" text-anchor="end" font-size="10" fill="#8a8a94">${fmtShort(points[points.length - 1].x)}</text>` : ''}</svg>`;
 }
 
+function barChart(vals, labels, hi = -1) {
+  const W = 340, H = 140, pt = 18, pb = 20, n = vals.length, gap = 8, bw = (W - gap * (n - 1)) / n, mx = Math.max(1, ...vals);
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}">${vals.map((v, i) => { const h = v / mx * (H - pt - pb), x = i * (bw + gap), y = H - pb - h, on = i === (hi < 0 ? n - 1 : hi);
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(2, h).toFixed(1)}" rx="5" fill="${on ? '#b8f26b' : 'rgba(255,255,255,.14)'}"/>
+      <text x="${(x + bw / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${on ? '#e9e9ee' : '#8a8a94'}">${v ? fmtBig(v) : ''}</text>
+      <text x="${(x + bw / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle" font-size="9.5" fill="#8a8a94">${esc(labels[i])}</text>`; }).join('')}</svg>`;
+}
+/* ---------- Músculos: series semanales ---------- */
+// Rango aproximado de series semanales para crecer (los músculos chicos reciben trabajo indirecto)
+const MRANGE = m => ['Bíceps', 'Tríceps', 'Gemelos'].includes(m) ? [8, 16] : ['Pecho', 'Espalda', 'Hombro', 'Cuádriceps', 'Femoral', 'Glúteo'].includes(m) ? [10, 20] : null;
+const muscleOf = e => { const x = exById(e.exerciseId); return (x && x.muscle) || e.muscle || 'Otro'; };
+function musWeek(ws) {
+  const we = addDays(ws, 7), out = {};
+  S.sessions.forEach(s => { if (s.start < ws || s.start >= we) return; s.exercises.forEach(e => {
+    const m = muscleOf(e), o = out[m] || (out[m] = { sets: 0, days: new Set() }); o.sets += e.sets.length; o.days.add(dayKey(s.start)); }); });
+  return out;
+}
+function musPlan() {
+  const out = {}, c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1;
+  planDays().forEach(r => { const seen = new Set(); r.items.forEach(it => { const ex = exById(it.exerciseId); const m = (ex && ex.muscle) || 'Otro';
+    const o = out[m] || (out[m] = { sets: 0, days: 0 }); o.sets += prescribe(it, ph, w).sets; if (!seen.has(m)) { seen.add(m); o.days++; } }); });
+  return out;
+}
+function musTips(P, W) {
+  const src = Object.keys(P).length ? P : W, isPlan = src === P, t = [];
+  MUSCLES.forEach(m => { const rg = MRANGE(m), o = src[m]; if (!rg) return;
+    const n = o ? o.sets : 0, d = o ? (isPlan ? o.days : o.days.size) : 0;
+    if (n <= rg[0] - 2 && (n > 0 || ['Pecho', 'Espalda', 'Cuádriceps', 'Femoral'].includes(m))) t.push(`<b>${m}</b>: ${isPlan ? 'tu plan da' : 'hiciste'} ${n} series por semana. Para que crezca conviene llegar a ${rg[0]}: sumá 1–2 series o un ejercicio.`);
+    else if (n > rg[1]) t.push(`<b>${m}</b>: ${n} series por semana es mucho. Podés bajar a ${rg[1]} sin perder progreso y recuperar mejor.`);
+    else if (n && d === 1 && rg[0] >= 10) t.push(`<b>${m}</b>: lo entrenás un solo día. Repartirlo en 2 días suele dar mejores resultados con las mismas series.`);
+  });
+  return { t, isPlan };
+}
+let musOff = 0, cmpMode = 'w';
+function vMuscles() {
+  const ws = addDays(weekStart(), 7 * musOff), W = musWeek(ws), P = musOff === 0 ? musPlan() : {};
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Progreso</div><h1 style="margin-top:6px">Músculos</h1>
+    <div class="row wknav"><button class="ghost" data-a="musNav" data-d="-1" aria-label="Semana anterior">‹</button><div class="sp c"><b>${musOff === 0 ? 'Esta semana' : musOff === -1 ? 'Semana pasada' : 'Semana del ' + fmtShort(ws)}</b><div class="mu sm">${fmtShort(ws)} – ${fmtShort(addDays(ws, 6))}</div></div>
+    <button class="ghost" data-a="musNav" data-d="1" ${musOff >= 0 ? 'disabled' : ''} aria-label="Semana siguiente">›</button></div>`;
+  const ms = MUSCLES.filter(m => (W[m] && W[m].sets) || (P[m] && P[m].sets));
+  if (!ms.length) h += `<div class="card mu">No hay series registradas esta semana.</div>`;
+  else {
+    const top = Math.max(22, ...ms.map(m => Math.max(W[m] ? W[m].sets : 0, P[m] ? P[m].sets : 0)));
+    h += `<div class="card" style="padding:8px 18px">${ms.map(m => {
+      const n = W[m] ? W[m].sets : 0, d = W[m] ? W[m].days.size : 0, pl = P[m] ? P[m].sets : 0, rg = MRANGE(m);
+      const st = !rg ? '' : musOff === 0 && n < pl ? ['pend', `En camino · faltan ${pl - n}`] : n > rg[1] ? ['alto', 'Alto'] : n >= rg[0] ? ['ok', 'En rango'] : ['bajo', 'Bajo'];
+      return `<div class="mrow"><div class="row"><b class="sp">${esc(m)}</b><span class="mu sm">${d ? d + (d === 1 ? ' día' : ' días') + ' · ' : ''}</span><b style="font-variant-numeric:tabular-nums;margin-left:4px">${n}${pl ? `<span class="mu" style="font-weight:500"> / ${pl}</span>` : ''}</b></div>
+        <div class="mtrack">${rg ? `<i class="zone" style="left:${rg[0] / top * 100}%;width:${(rg[1] - rg[0]) / top * 100}%"></i>` : ''}<i class="fill ${st ? st[0] : ''}" style="width:${Math.min(100, n / top * 100)}%"></i>${pl ? `<i class="ptk" style="left:${Math.min(99.5, pl / top * 100)}%"></i>` : ''}</div>
+        ${st ? `<div class="mst ${st[0]}">${st[1]}${rg ? ` · ideal ${rg[0]}–${rg[1]}` : ''}</div>` : ''}</div>`; }).join('')}</div>
+      <p class="mu sm" style="margin-top:-4px">Series hechas${musOff === 0 && Object.keys(P).length ? ' / las que pide tu plan (la rayita blanca)' : ''}. La zona marcada es el rango recomendado por semana para ganar músculo.</p>`;
+  }
+  const T = musTips(musOff === 0 ? P : {}, W);
+  if (T.t.length) h += `<h2>Sugerencias${T.isPlan ? ' para tu plan' : ''}</h2><div class="card sm" style="line-height:1.5">${T.t.slice(0, 5).map(x => `<p style="margin:6px 0">${x}</p>`).join('')}</div>`;
+  else if (ms.length) h += `<div class="card sm">✓ ${T.isPlan ? 'Tu plan' : 'Esta semana'} tiene un volumen equilibrado en todos los músculos principales.</div>`;
+  // Distribución últimas 4 semanas
+  const D = {}; for (let k = 0; k < 4; k++) { const w4 = musWeek(addDays(weekStart(), -7 * k)); Object.keys(w4).forEach(m => D[m] = (D[m] || 0) + w4[m].sets); }
+  const tot = Object.values(D).reduce((a, b) => a + b, 0);
+  if (tot) {
+    const L = Object.entries(D).sort((a, b) => b[1] - a[1]), COL = ['#b8f26b', '#7fd3ff', '#9b8cff', '#ffb347', '#ff7ab6', '#5fe3c0', '#f2e86b', '#c9a0ff'];
+    h += `<h2>Cómo repartís el trabajo · últimas 4 semanas</h2><div class="card"><div class="dist">${L.map(([m, v], i) => `<i style="width:${v / tot * 100}%;background:${COL[i % COL.length]}${i >= COL.length ? ';opacity:.5' : ''}"></i>`).join('')}</div>
+      <div class="dleg">${L.map(([m, v], i) => `<span><i style="background:${COL[i % COL.length]}"></i>${esc(m)} <b>${Math.round(v / tot * 100)}%</b></span>`).join('')}</div></div>`;
+  }
+  // Comparar
+  h += `<h2>Comparar</h2><div class="seg" style="margin-bottom:12px">${[['w', 'Semanas'], ['m', 'Meses'], ['p', 'Fases']].map(([k, l]) => `<button class="${cmpMode === k ? 'on' : ''}" data-a="cmpMode" data-k="${k}">${l}</button>`).join('')}</div>`;
+  if (cmpMode === 'w') {
+    const wk = Array.from({ length: 8 }, (_, k) => addDays(weekStart(), -7 * (7 - k)));
+    const sets = wk.map(t => Object.values(musWeek(t)).reduce((a, o) => a + o.sets, 0)), ses = wk.map(t => weekCount(t));
+    const prev = sets.slice(0, 7).filter(Boolean), avg = prev.length ? Math.round(prev.reduce((a, b) => a + b, 0) / prev.length) : 0;
+    h += `<div class="card"><div class="mu sm">Series por semana</div>${barChart(sets, wk.map(t => fmtShort(t).split(' ')[0] + '/' + (new Date(t).getMonth() + 1)))}
+      <div class="tiles" style="margin-top:12px"><div class="tile"><b>${sets[7]}</b><span>Esta semana</span></div><div class="tile"><b>${avg}</b><span>Promedio</span></div><div class="tile"><b>${ses[7]}</b><span>Entrenos</span></div></div></div>`;
+  } else if (cmpMode === 'm') {
+    const now = new Date(), M = Array.from({ length: 6 }, (_, k) => new Date(now.getFullYear(), now.getMonth() - 5 + k, 1).getTime());
+    const rows = M.map((t, k) => { const e = k < 5 ? M[k + 1] : Infinity, ss = S.sessions.filter(s => s.start >= t && s.start < e);
+      return { t, n: ss.length, sets: ss.reduce((a, s) => a + sessSets(s), 0), vol: ss.reduce((a, s) => a + sessVol(s), 0) }; });
+    h += `<div class="card"><div class="mu sm">Series por mes</div>${barChart(rows.map(r => r.sets), rows.map(r => new Date(r.t).toLocaleDateString('es-UY', { month: 'short' }).replace('.', '')))}</div>
+      <div class="card" style="padding:4px 18px">${[...rows].reverse().map(r => `<div class="exrow"><div class="sp" style="font-weight:600">${cap(new Date(r.t).toLocaleDateString('es-UY', { month: 'long', year: 'numeric' }))}</div>
+        <div class="mu sm" style="text-align:right">${r.n} entrenos · ${r.sets} series<br>${fmtBig(r.vol)} ${unit()} de volumen</div></div>`).join('')}</div>`;
+  } else {
+    const B = []; S.sessions.forEach(s => { const nm = s.phase ? s.phase.split(' · semana')[0] : null; if (!nm) return;
+      const b = B[B.length - 1]; if (b && b.name === nm) b.ss.push(s); else B.push({ name: nm, ss: [s] }); });
+    if (!B.length) h += `<div class="card mu">Cuando entrenes con un programa por fases vas a poder comparar cómo te fue en cada una.</div>`;
+    [...B].reverse().forEach(b => {
+      const a = b.ss[0].start, z = b.ss[b.ss.length - 1].start, wks = Math.max(1, Math.round((weekStart(z) - weekStart(a)) / WEEK) + 1), sets = b.ss.reduce((x, s) => x + sessSets(s), 0);
+      const fx = {}; b.ss.forEach(s => s.exercises.forEach(e => { const best = Math.max(0, ...e.sets.map(x => x.w > 0 ? e1rm(x.w, x.r + (x.rir || 0)) : 0)); if (!best) return; (fx[e.exerciseId] = fx[e.exerciseId] || []).push(best); }));
+      const ch = Object.values(fx).filter(v => v.length > 1).map(v => (v[v.length - 1] - v[0]) / v[0] * 100), avg = ch.length ? Math.round(ch.reduce((x, y) => x + y, 0) / ch.length * 10) / 10 : null;
+      h += `<div class="card"><div class="row"><div class="sp"><div class="t">${esc(b.name)}</div><div class="mu sm">${fmtShort(a)} – ${fmtShort(z)} · ${wks} ${wks === 1 ? 'semana' : 'semanas'}</div></div>
+        ${avg !== null ? `<div style="text-align:right"><b class="${avg >= 0 ? 'up' : 'down'}" style="font-size:20px">${avg > 0 ? '+' : ''}${fmtNum(avg)}%</b><div class="mu sm">fuerza</div></div>` : ''}</div>
+        <div class="tiles" style="margin-top:12px"><div class="tile"><b>${b.ss.length}</b><span>Entrenos</span></div><div class="tile"><b>${Math.round(sets / wks)}</b><span>Series/sem.</span></div><div class="tile"><b>${fmtBig(b.ss.reduce((x, s) => x + sessVol(s), 0))}</b><span>Volumen</span></div></div></div>`;
+    });
+  }
+  return h;
+}
 /* ---------- Navegación ---------- */
 let R = { view: S.active ? 'workout' : (cloudOn() && !AUTH && !S.skipWelcome ? 'welcome' : 'home'), id: null, from: 'home' };
 let draft = null, editHist = false, peek = false, metric = 'ent', fresh = null;
@@ -1108,7 +1218,7 @@ function navScroll() {
 window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
-  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, muscles: vMuscles, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -1123,7 +1233,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', muscles: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -1536,6 +1646,11 @@ function vProgress() {
     h += `<div class="card"><div class="mu sm">Fuerza en las últimas 4 semanas</div><div class="row" style="align-items:baseline;gap:10px;margin-top:4px">
       <div class="bigstat ${avg >= 0 ? 'up' : 'down'}" style="font-size:40px">${avg > 0 ? '+' : ''}${fmtNum(avg)}%</div><span class="mu sm">promedio en ${ch.length} ${ch.length === 1 ? 'ejercicio' : 'ejercicios'}</span></div></div>`; }
   if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px"><div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div><span class="mu sm">Pesos sugeridos</span></div>${dayRecsHtml(nx)}<button class="big" style="margin:8px 0 14px" data-a="openCoach">Ver pesos de todos los días</button></div>`;
+  { const W = musWeek(weekStart()), Pm = musPlan(), main = MUSCLES.filter(m => MRANGE(m) && ((W[m] && W[m].sets) || (Pm[m] && Pm[m].sets)));
+    const ok = main.filter(m => W[m] && W[m].sets >= MRANGE(m)[0]).length;
+    h += `<h2>Músculos</h2><div class="card clickable" data-a="openMuscles"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Series por músculo y comparaciones</div>
+      <div class="mu sm">${main.length ? `Esta semana: ${ok} de ${main.length} músculos en rango` : 'Volumen semanal, frecuencia, meses y fases'}</div></div><span class="mu">›</span></div>
+      ${main.length ? `<div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div>` : ''}</div>`; }
   h += `<h2>Tu máximo estimado por ejercicio</h2><div class="card" style="padding:4px 18px">`;
   seen.forEach((name, id) => {
     const ser = exSeries(id); if (!ser.length) return;
@@ -2354,7 +2469,7 @@ const A = {
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { if (R.view === 'coach') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'coach' || R.view === 'muscles') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -2438,6 +2553,9 @@ const A = {
       <button class="big" data-a="startFree">Sesión libre</button>`);
   },
   openCoach: () => go('coach'),
+  openMuscles: () => { musOff = 0; go('muscles'); },
+  musNav: d => { musOff = Math.min(0, musOff + (+d.d)); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  cmpMode: d => { cmpMode = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   deloadOn: () => { S.deloadWk = weekStart(); S.updatedAt = Date.now(); save(); render(); toast('Semana de descarga activada 🔋'); },
   deloadOff: () => { S.deloadWk = 0; S.updatedAt = Date.now(); save(); render(); toast('Descarga cancelada'); },
   deloadSnooze: () => { S.deloadSnooze = Date.now() + 7 * 864e5; save(false); render(); },
