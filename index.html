@@ -520,6 +520,12 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 .mrow.clickable:active,.card.clickable:active{transform:scale(.985)}
 .cb,.cbadge{animation:fadein .4s ease both}
 @media (prefers-reduced-motion:reduce){#app.enter *{animation:none!important}}
+.ic{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--acd);color:var(--ac)}
+.ic svg{width:20px;height:20px}
+.ic.blue{background:rgba(127,211,255,.12);color:#7fd3ff}.ic.violet{background:rgba(155,140,255,.14);color:#a99cff}
+.ic.orange{background:rgba(255,179,71,.13);color:#ffb347}.ic.pink{background:rgba(255,122,182,.12);color:#ff7ab6}
+.row>.ic+.sp,.exrow>.ic+.sp{margin-left:2px}
+#app.enter .ic{animation:pop .5s cubic-bezier(.2,.9,.3,1.3) .15s both}
 </style>
 </head>
 <body>
@@ -540,7 +546,7 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '7.3';
+const KEY = 'entreno.v1', VERSION = '7.4';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -723,10 +729,10 @@ function deloadAdvice() {
   return ev >= 3 && bad >= 3 && bad / ev >= 0.4 ? { bad, ev } : null;
 }
 function deloadCard() {
-  if (deloadNow()) return `<div class="card row"><div style="font-size:26px">🔋</div><div class="sp"><div class="t">Semana de descarga</div>
+  if (deloadNow()) return `<div class="card row">${ico('battery', 'blue')}<div class="sp"><div class="t">Semana de descarga</div>
     <div class="mu sm">Una serie menos y ~85% del peso, lejos del fallo. No cuenta como semana de la fase.</div></div><button class="sm ghost" data-a="deloadOff">Cancelar</button></div>`;
   const d = deloadAdvice(); if (!d) return '';
-  return `<div class="card hl"><div class="row" style="align-items:flex-start"><div style="font-size:28px">🔋</div><div class="sp"><div class="t">Tu cuerpo pide una semana de descarga</div>
+  return `<div class="card hl"><div class="row" style="align-items:flex-start">${ico('battery', 'blue')}<div class="sp"><div class="t">Tu cuerpo pide una semana de descarga</div>
     <div class="mu sm">En ${d.bad} de ${d.ev} ejercicios no estás mejorando o rendiste menos que antes. Una semana más liviana suele destrabarlo: recuperás y volvés más fuerte.</div></div></div>
     <div class="row" style="gap:8px;margin-top:12px"><button class="pri sp" data-a="deloadOn">Hacer descarga esta semana</button><button class="ghost" data-a="deloadSnooze">Ahora no</button></div></div>`;
 }
@@ -1350,6 +1356,20 @@ function vMuscle() {
       return `<div class="exrow"><div class="sp"><div style="font-weight:600">${esc(x.name)}</div><div class="mu sm">${sec.length ? 'También trabaja: ' + sec.join(', ') : 'Trabajo directo'}</div></div><button class="sm" data-a="addToDay" data-id="${x.id}">+ Agregar</button></div>`; }).join('')}</div>`;
   return h;
 }
+/* ---------- Íconos de tarjetas ---------- */
+const ICP = {
+  trend: '<path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/>',
+  dumbbell: '<path d="M6.5 6.5v11M3.5 9v6M17.5 6.5v11M20.5 9v6M6.5 12h11"/>',
+  bars: '<path d="M4 6h11M4 12h16M4 18h7"/>',
+  scale: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8.5 10a4.5 4.5 0 0 1 7 0"/><path d="M12 10.5l1.6-1.8"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
+  shield: '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M9 12l2 2 4-4"/>',
+  battery: '<rect x="3" y="7" width="16" height="10" rx="2.5"/><path d="M21 10.5v3"/><path d="M11.5 9l-2 3h3l-2 3"/>',
+  target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+  calx: '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4M10 13.5l4 4M14 13.5l-4 4"/>',
+};
+const ico = (n, tone = '') => `<span class="ic ${tone}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICP[n]}</svg></span>`;
 /* ---------- Cuerpo ---------- */
 let bodyM = 'weight';
 const BODYF = { weight: ['Peso', 'kg'], fat: ['Grasa', '%'], muscle: ['Músculo', 'kg'], lean: ['Magra', 'kg'] };
@@ -1658,7 +1678,7 @@ function vHome() {
   const lbk = S.settings.lastBackup || 0;
   if (S.sessions.length && !S.active && Date.now() - lbk > WEEK && Date.now() > (S.backupSnooze || 0)) {
     const ago = lbk ? Math.floor((Date.now() - lbk) / 864e5) : 0;
-    h += `<div class="card"><div class="row" style="align-items:flex-start"><div style="font-size:28px">🛟</div><div class="sp"><div class="t">Guardá tu copia de seguridad</div>
+    h += `<div class="card"><div class="row" style="align-items:flex-start">${ico('shield', 'violet')}<div class="sp"><div class="t">Guardá tu copia de seguridad</div>
       <div class="mu sm">${lbk ? `La última fue hace ${ago} días.` : 'Todavía no guardaste ninguna.'} Un toque y queda en Archivos o iCloud Drive, por si algún día perdés el teléfono.</div></div></div>
       <div class="row" style="gap:8px;margin-top:12px"><button class="pri sp" data-a="export">Guardar copia</button><button class="ghost" data-a="snoozeBackup">Más tarde</button></div></div>`;
   }
@@ -1802,7 +1822,7 @@ function vProgram() {
     <div class="card">${timeline(p, true)}</div>`;
   if (!p.active) h += `<button class="big pri" data-a="activateProg" data-id="${p.id}">Usar este programa</button>`;
   if (c && c.done) h += phaseDoneCard(c);
-  h += `<div class="card clickable" data-a="weekMode"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Cómo avanzan las semanas</div>
+  h += `<div class="card clickable" data-a="weekMode"><div class="row">${ico('clock', 'blue')}<div class="sp"><div class="t" style="font-size:16px">Cómo avanzan las semanas</div>
     <div class="mu sm">${S.settings.weekMode === 'cal' ? 'Por calendario: pasa una semana cada lunes' : 'Solo cuentan las semanas que entrenás'}</div></div><span class="mu">›</span></div></div>`;
   h += `<h2>Fases</h2>`;
   if (!p.phases.length) h += `<div class="card mu">Todavía no tiene fases.</div>`;
@@ -1926,16 +1946,16 @@ function vProgress() {
   const nx = plan().next;
   if (ch.length || nx) h += `<div class="row" style="margin:28px 0 12px"><h2 class="sp" style="margin:0">Tu entrenador</h2><button class="link" data-a="openCoach">Ver todo ›</button></div>`;
   if (ch.length) { const avg = Math.round(ch.reduce((a, b) => a + b, 0) / ch.length * 10) / 10;
-    h += `<div class="card"><div class="mu sm">Fuerza en las últimas 4 semanas</div><div class="row" style="align-items:baseline;gap:10px;margin-top:4px">
+    h += `<div class="card"><div class="row" style="gap:12px">${ico('trend')}<div class="mu sm sp">Fuerza en las últimas 4 semanas</div></div><div class="row" style="align-items:baseline;gap:10px;margin-top:8px">
       <div class="bigstat ${avg >= 0 ? 'up' : 'down'}" style="font-size:40px">${avg > 0 ? '+' : ''}${fmtNum(avg)}%</div><span class="mu sm">promedio en ${ch.length} ${ch.length === 1 ? 'ejercicio' : 'ejercicios'}</span></div></div>`; }
-  if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px"><div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div><span class="mu sm">Pesos sugeridos</span></div>${dayRecsHtml(nx)}<button class="big" style="margin:8px 0 14px" data-a="openCoach">Ver pesos de todos los días</button></div>`;
+  if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px">${ico('dumbbell')}<div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div></div>${dayRecsHtml(nx)}<button class="big" style="margin:8px 0 14px" data-a="openCoach">Ver pesos de todos los días</button></div>`;
   { const W = musWeek(weekStart()), Pm = musPlan(), main = AM.filter(a => a[1]).map(a => a[0]);
     const ok = main.filter(m => W[m] && W[m].sets >= MRANGE(m)[0]).length;
-    h += `<h2>Músculos</h2><div class="card clickable" data-a="openMuscles"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Series por músculo y comparaciones</div>
+    h += `<h2>Músculos</h2><div class="card clickable" data-a="openMuscles"><div class="row">${ico('bars', 'pink')}<div class="sp"><div class="t" style="font-size:16px">Series por músculo</div>
       <div class="mu sm">Esta semana: ${ok} de ${main.length} músculos en rango · ver qué suma a cada uno</div></div><span class="mu">›</span></div>
       ${main.length ? `<div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div>` : ''}</div>`; }
   { const L = S.body[S.body.length - 1], d = bodyDelta();
-    h += `<div class="card clickable" data-a="openBody"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Cuerpo</div>
+    h += `<div class="card clickable" data-a="openBody"><div class="row">${ico('scale', 'orange')}<div class="sp"><div class="t" style="font-size:16px">Cuerpo</div>
       <div class="mu sm">${L ? `${fmtNum(L.weight).replace('.', ',')} kg${L.fat != null ? ' · ' + fmtNum(L.fat).replace('.', ',') + '% grasa' : ''}${d !== null && d ? ` · ${d > 0 ? '+' : ''}${fmtNum(d).replace('.', ',')} kg en el mes` : ''}` : 'Peso, bioimpedancia y fuerza relativa'}</div></div><span class="mu">›</span></div></div>`; }
   h += `<h2>Tu máximo estimado por ejercicio</h2><div class="card" style="padding:4px 18px">`;
   seen.forEach((name, id) => {
@@ -2259,14 +2279,14 @@ function vConsistency() {
   const W0 = Math.max(weekStart(S.sessions[0].start), addDays(weekStart(), -7 * 11)), wk = []; for (let t = W0; t <= weekStart(); t = addDays(t, 7)) wk.push(t);
   const done = wk.map(cnt), past = wk.slice(0, -1), pd = done.slice(0, -1);
   const plan = past.length * goal, got = pd.reduce((a, v) => a + Math.min(v, goal), 0), adh = plan ? Math.round(got / plan * 100) : null, miss = plan - got;
-  h += `<h2>Planeado contra hecho</h2><div class="card">${adh !== null ? `<div class="bigstat ${adh >= 80 ? 'up' : ''}" style="font-size:40px;line-height:1">${adh}%</div><div class="mu sm" style="margin-top:6px">de los entrenos planeados en las últimas ${past.length === 1 ? 'semana' : past.length + ' semanas'}</div>` : ''}
+  h += `<h2>Planeado contra hecho</h2><div class="card">${adh !== null ? `<div class="row" style="gap:12px;margin-bottom:14px">${ico('target')}<span class="mu sm sp">Tu objetivo: ${goal} por semana</span></div><div class="bigstat ${adh >= 80 ? 'up' : ''}" style="font-size:40px;line-height:1">${adh}%</div><div class="mu sm" style="margin-top:6px">de los entrenos planeados en las últimas ${past.length === 1 ? 'semana' : past.length + ' semanas'}</div>` : ''}
     <div class="pvh">${wk.map((t, i) => { const v = done[i], cur = i === wk.length - 1; return `<div class="${cur ? 'cur' : v >= goal ? 'ok' : v ? 'part' : 'zero'}"><div class="bw"><i style="height:${Math.min(100, v / goal * 100)}%"></i><b style="bottom:calc(${Math.min(100, v / goal * 100)}% + 5px)">${v}</b></div><span>${new Date(t).getDate()}/${new Date(t).getMonth() + 1}</span></div>`; }).join('')}</div>
-    <p class="mu sm" style="margin:8px 0 0">Tu objetivo: ${goal} por semana (la línea punteada).${miss > 0 ? ` En este tiempo quedaron ${miss} ${miss === 1 ? 'entreno' : 'entrenos'} sin hacer.` : ' ¡No te faltó ninguno!'}${done[done.length - 1] < goal ? ` Esta semana te ${goal - done[done.length - 1] === 1 ? 'falta 1' : `faltan ${goal - done[done.length - 1]}`}.` : ''}</p></div>`;
+    <p class="mu sm" style="margin:8px 0 0">La línea punteada es tu objetivo.${miss > 0 ? ` En este tiempo quedaron ${miss} ${miss === 1 ? 'entreno' : 'entrenos'} sin hacer.` : ' ¡No te faltó ninguno!'}${done[done.length - 1] < goal ? ` Esta semana te ${goal - done[done.length - 1] === 1 ? 'falta 1' : `faltan ${goal - done[done.length - 1]}`}.` : ''}</p></div>`;
   const pdays = planDays();
   if (pdays.length > 1 && past.length >= 3) {
     const sk = pdays.map(r => ({ r, n: past.filter(t => !S.sessions.some(s => s.routineId === r.id && s.start >= t && s.start < addDays(t, 7))).length })).sort((a, b) => b.n - a.n);
-    if (sk[0].n) h += `<div class="card"><div class="mu sm">El día que más se te queda afuera</div><div class="t" style="margin-top:4px">${esc(sk[0].r.name)}</div>
-      <div class="mu sm">Faltó ${sk[0].n} de ${past.length} semanas.${sk[0].n >= past.length / 2 ? ' Si suele pasar, probá hacerlo primero en la semana.' : ''}</div></div>`;
+    if (sk[0].n) h += `<div class="card row" style="align-items:flex-start">${ico('calx', 'pink')}<div class="sp"><div class="mu sm">El día que más se te queda afuera</div><div class="t" style="margin-top:4px">${esc(sk[0].r.name)}</div>
+      <div class="mu sm">Faltó ${sk[0].n} de ${past.length} semanas.${sk[0].n >= past.length / 2 ? ' Si suele pasar, probá hacerlo primero en la semana.' : ''}</div></div></div>`;
   }
   return h;
 }
@@ -2456,7 +2476,7 @@ function vProfile() {
     <label class="f sp"><span>Año de nacimiento</span><input inputmode="numeric" data-f="prof" data-k="birthYear" value="${esc(P.birthYear)}" placeholder="2000"></label></div>
     <label class="f" style="margin-bottom:0"><span>Objetivo</span><select data-f="prof" data-k="goal">${['', 'Ganar músculo', 'Ganar fuerza', 'Perder grasa', 'Recomposición', 'Mantenerme'].map(g => `<option ${g === P.goal ? 'selected' : ''} value="${g}">${g || 'Elegir…'}</option>`).join('')}</select></label></div>`;
   { const L = S.body[S.body.length - 1];
-    h += `<h2>Cuerpo</h2><div class="card clickable" data-a="openBody"><div class="row"><div class="sp"><div class="t" style="font-size:16px">${L ? fmtNum(L.weight).replace('.', ',') + ' kg' : 'Peso y bioimpedancia'}</div>
+    h += `<h2>Cuerpo</h2><div class="card clickable" data-a="openBody"><div class="row">${ico('scale', 'orange')}<div class="sp"><div class="t" style="font-size:16px">${L ? fmtNum(L.weight).replace('.', ',') + ' kg' : 'Peso y bioimpedancia'}</div>
       <div class="mu sm">${L ? 'Última medición: ' + fmtShort(L.date) : 'Registrá tus mediciones'}</div></div><span class="mu">›</span></div></div>`; }
   if (age) h += `<p class="mu sm c" style="margin-top:14px">${age} años${P.goal ? ' · ' + esc(P.goal) : ''}</p>`;
   return h;
@@ -2579,7 +2599,7 @@ function vSettings() {
   return `<h1>Ajustes</h1>
   <div class="card" style="padding:4px 18px">
     <div class="exrow" data-a="tab" data-v="profile">${avatar(true)}<div class="sp"><div style="font-weight:650">${esc(uname() || 'Tu perfil')}</div><div class="mu sm">Cuenta, datos y peso corporal</div></div><span class="mu">›</span></div>
-    <div class="exrow" data-a="tab" data-v="exercises"><div class="sp"><div style="font-weight:650">Ejercicios</div><div class="mu sm">${S.exercises.length} en tu biblioteca · editar y crear</div></div><span class="mu">›</span></div></div>
+    <div class="exrow" data-a="tab" data-v="exercises">${ico('list')}<div class="sp"><div style="font-weight:650">Ejercicios</div><div class="mu sm">${S.exercises.length} en tu biblioteca · editar y crear</div></div><span class="mu">›</span></div></div>
   <h2>Entrenamiento</h2><div class="card">
     <button class="exrow" style="width:100%;background:none;border-radius:0;padding:0 0 14px;margin-bottom:6px;text-align:left" data-a="goalMenu"><div class="sp"><div style="font-weight:650">Objetivo semanal</div>
     <div class="mu sm">${weeklyGoal()} entrenamientos por semana · cuenta para tu racha</div></div><span class="mu">›</span></button>
