@@ -481,6 +481,16 @@ details.tech[open] summary::after{transform:rotate(90deg)}
 details.tech summary .mu{margin-left:auto}
 details.tech ol,details.tech ul{margin:12px 0 0;padding-left:20px;line-height:1.5;font-size:14.5px}
 details.tech li{margin:4px 0}
+.exph{position:relative;aspect-ratio:3/2;border-radius:20px;overflow:hidden;background:var(--s1);margin:0 0 14px}
+.exph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.92)}
+.exph:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,13,0) 55%,rgba(11,11,13,.75));pointer-events:none}
+.exph .b{animation:xf 3.6s ease-in-out infinite alternate}
+.exph .exl{position:absolute;left:12px;bottom:10px;z-index:1;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff}
+.exph .exl i{font-style:normal;position:absolute;left:0;bottom:0;white-space:nowrap;padding:5px 10px;border-radius:99px;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.exph .exl i:first-child{animation:xf 3.6s ease-in-out infinite alternate-reverse}
+@keyframes xf{0%,38%{opacity:0}62%,100%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.exph .b{animation:none;opacity:0}.exph .exl i:first-child{animation:none}}
+.sheet .exph{margin-top:4px}
 </style>
 </head>
 <body>
@@ -501,7 +511,7 @@ details.tech li{margin:4px 0}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.9';
+const KEY = 'entreno.v1', VERSION = '7.0';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1136,6 +1146,13 @@ const INFO = (() => { const I = {
   'Rueda abdominal': ['Peso corporal', ['De rodillas con la rueda adelante.', 'Rodá hacia adelante con el abdomen firme hasta donde controles.', 'Volvé tirando con el abdomen.'], ['Arquear la zona lumbar.', 'Ir más lejos de lo que podés controlar.']],
 }; const o = {}; Object.keys(I).forEach(k => o[norm(k)] = I[k]); return o; })();
 const EQUIP = ['Barra', 'Mancuernas', 'Polea', 'Máquina', 'Smith', 'Peso corporal', 'Otro'];
+const PHOTO = (() => { const P = {"Press de banca con barra": "barbell-bench-press-medium-grip", "Press inclinado con barra": "barbell-incline-bench-press-medium-grip", "Press de banca con mancuernas": "dumbbell-bench-press", "Press inclinado con mancuernas": "incline-dumbbell-press", "Press en máquina": "machine-bench-press", "Aperturas con mancuernas": "dumbbell-flyes", "Cruces en polea": "cable-crossover", "Pec deck": "butterfly", "Fondos en paralelas": "dips-chest-version", "Flexiones": "pushups", "Press militar con barra": "standing-military-press", "Press de hombro con mancuernas": "dumbbell-shoulder-press", "Press de hombro en máquina": "machine-shoulder-military-press", "Elevaciones laterales": "side-lateral-raise", "Elevaciones laterales en polea": "cable-seated-lateral-raise", "Elevaciones frontales": "front-dumbbell-raise", "Pájaros (deltoide posterior)": "seated-bent-over-rear-delt-raise", "Face pull": "face-pull", "Extensión de tríceps en polea": "triceps-pushdown", "Extensión de tríceps sobre la cabeza": "cable-rope-overhead-triceps-extension", "Press francés": "lying-triceps-press", "Press cerrado": "close-grip-barbell-bench-press", "Patada de tríceps": "tricep-dumbbell-kickback", "Dominadas": "pullups", "Jalón al pecho": "wide-grip-lat-pulldown", "Jalón agarre cerrado": "v-bar-pulldown", "Remo con barra": "bent-over-barbell-row", "Remo con mancuerna": "one-arm-dumbbell-row", "Remo en polea baja": "seated-cable-rows", "Remo en máquina": "leverage-iso-row", "Remo en T": "t-bar-row-with-handle", "Pullover en polea": "straight-arm-pulldown", "Peso muerto": "barbell-deadlift", "Encogimientos": "dumbbell-shrug", "Curl con barra": "barbell-curl", "Curl con mancuernas": "dumbbell-bicep-curl", "Curl martillo": "hammer-curls", "Curl martillo en banco Scott": "preacher-hammer-dumbbell-curl", "Curl en banco inclinado": "incline-dumbbell-curl", "Curl en polea": "standing-biceps-cable-curl", "Curl predicador": "preacher-curl", "Curl de muñeca": "palms-up-barbell-wrist-curl-over-a-bench", "Sentadilla con barra": "barbell-full-squat", "Sentadilla frontal": "front-squat-clean-grip", "Prensa de piernas": "leg-press", "Sentadilla hack": "hack-squat", "Extensión de cuádriceps": "leg-extensions", "Camilla de cuádriceps": "leg-extensions", "Zancadas": "dumbbell-lunges", "Estocadas en Smith": "barbell-lunge", "Sentadilla búlgara": "split-squat-with-dumbbells", "Sentadilla goblet": "goblet-squat", "Peso muerto rumano": "romanian-deadlift", "Buenos días": "good-morning", "Curl femoral acostado": "lying-leg-curls", "Curl femoral sentado": "seated-leg-curl", "Hip thrust": "barbell-hip-thrust", "Patada de glúteo en polea": "one-legged-cable-kickback", "Abducción en máquina": "thigh-abductor", "Aducción en máquina": "thigh-adductor", "Elevación de talones de pie": "standing-calf-raises", "Elevación de talones sentado": "seated-calf-raise", "Gemelos en prensa": "calf-press-on-the-leg-press-machine", "Elevación de talones unilateral con mancuerna": "standing-dumbbell-calf-raise", "Plancha": "plank", "Crunch en polea": "cable-crunch", "Elevación de piernas colgado": "hanging-leg-raise", "Rueda abdominal": "ab-roller"}; const o = {}; Object.keys(P).forEach(k => o[norm(k)] = P[k]); return o; })();
+// Fotos de inicio y final del movimiento (base libre free-exercise-db), alternando suave
+function photoHtml(x) {
+  if (!x || S.settings.photos === false) return ''; const f = PHOTO[norm(x.name)]; if (!f) return '';
+  return `<div class="exph"><img src="img/ex/${f}-0.jpg" alt="" loading="lazy" onerror="this.parentNode.remove()"><img class="b" src="img/ex/${f}-1.jpg" alt="" loading="lazy">
+    <span class="exl"><i>Inicio</i><i class="b">Final</i></span></div>`;
+}
 function exInfo(x) { const i = x ? INFO[norm(x.name)] : null; return { eq: (x && x.eq) || (i ? i[0] : 'Otro'), how: i ? i[1] : [], err: i ? i[2] : [] }; }
 const mainMus = id => { const m = exMus(id); return Object.keys(m).find(k => m[k] >= 1) || Object.keys(m)[0] || 'Otro'; };
 function recentEx(n = 8) { const out = []; for (let i = S.sessions.length - 1; i >= 0 && out.length < n; i--) S.sessions[i].exercises.forEach(e => { if (out.length < n && !out.includes(e.exerciseId) && exById(e.exerciseId)) out.push(e.exerciseId); }); return out; }
@@ -1838,7 +1855,7 @@ function vExercise() {
   const name = ex ? ex.name : 'Ejercicio', rx = rxFor(id), k = coach(id, rx);
   let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button><span class="sp"></span>${ex ? `<button class="sm ghost star ${ex.fav ? 'on' : ''}" data-a="exFav" data-id="${ex.id}" aria-label="Favorito">${ex.fav ? '★' : '☆'}</button><button class="sm" data-a="exEdit" data-id="${ex.id}">Editar</button>` : ''}</div>
     <div class="kicker">${esc(ex ? exInfo(ex).eq : '')}</div><h1 style="margin-top:6px">${esc(name)}</h1>
-    <div class="mchips" style="margin:-4px 0 16px">${musChips(id)}</div>`;
+    <div class="mchips" style="margin:-4px 0 16px">${musChips(id)}</div>${photoHtml(ex)}`;
   // Qué hacer la próxima vez
   h += `<div class="card coach"><div class="row" style="align-items:flex-start"><div class="sp"><div class="kicker" style="font-size:11px">Próxima vez${rx ? ' · ' + esc(rx.label) : ''}</div>
     <div class="bigstat" style="font-size:42px;margin-top:6px">${k.w ? fmtNum(k.w) + `<span class="mu" style="font-size:20px;font-weight:600"> ${u}</span>` : '—'}</div>
@@ -2471,6 +2488,7 @@ function vSettings() {
       <option value="kg" ${unit() === 'kg' ? 'selected' : ''}>Kilos (kg)</option><option value="lb" ${unit() === 'lb' ? 'selected' : ''}>Libras (lb)</option></select></label>
     <label class="f"><span>Cuánto suman los botones − / + de peso</span><select data-f="step">${STEPS.map(v => `<option value="${v}" ${v == S.settings.step ? 'selected' : ''}>${fmtNum(v)} ${unit()}</option>`).join('')}</select></label>
     <label class="f"><span>Peso de la barra (para calcular los discos)</span><select data-f="bar">${[10, 15, 20].map(v => `<option value="${v}" ${v == S.settings.bar ? 'selected' : ''}>${v} kg</option>`).join('')}</select></label>
+    <button class="toggle ${S.settings.photos === false ? '' : 'on'}" data-a="togPhotos" style="margin-top:4px"><span class="sp"><b>Fotos de los ejercicios</b><br><span class="mu sm">Inicio y final del movimiento en cada ficha</span></span><span class="sw"><i></i></span></button>
     <label class="f" style="margin-bottom:0"><span>Descanso por defecto para ejercicios nuevos</span><select data-f="drest">${RESTS.map(v => `<option value="${v}" ${v == S.settings.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>
   </div>
   <h2>Respaldo</h2><div class="card">
@@ -2667,6 +2685,7 @@ const A = {
       <button class="big ghost" data-a="closeModal">Cancelar</button>`);
   },
   eeUni: (d, el) => el.classList.toggle('on'),
+  togPhotos: (d, el) => { S.settings.photos = S.settings.photos === false; S.settings.u = Date.now(); el.classList.toggle('on', S.settings.photos); save(); },
   eeMus: d => { const w = eeMM[d.k] || 0, nw = w >= 1 ? .5 : w ? 0 : 1; if (nw) eeMM[d.k] = nw; else delete eeMM[d.k]; $('#ee_mm').innerHTML = eeChips(); },
   exFav: d => { const e = exById(d.id); if (!e) return; e.fav = !e.fav; e.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(e.fav ? 'Agregado a favoritos ★' : 'Quitado de favoritos'); },
   exMF: d => { exMF = d.k; const l = $('#exlist'); render(); },
@@ -3073,7 +3092,7 @@ const A = {
   },
   exHist: () => {
     const e = curEx(), ser = exSeries(e.exerciseId);
-    openModal(`<div class="kicker">${esc(e.muscle || '')}</div><div class="t" style="font-size:21px;margin-top:4px">${esc(e.name)}</div>
+    openModal(`<div class="kicker">${esc(e.muscle || '')}</div><div class="t" style="font-size:21px;margin:4px 0 12px">${esc(e.name)}</div>${photoHtml(exById(e.exerciseId))}
       ${ser.length ? `<div class="mu sm" style="margin-top:8px">Fuerza estimada (1RM): <b style="color:var(--tx)">${Math.round(ser[ser.length - 1].e1)} ${unit()}</b></div>${lineChart(ser.slice(-12).map(x => ({ x: x.date, y: x.e1 })), unit())}
       <div style="margin-top:8px">${[...ser].reverse().slice(0, 5).map(x => `<div class="drow"><span class="sp">${fmtShort(x.date)}</span><span class="mu sm">${x.sets.map(s => fmtNum(s.w) + '×' + s.r).join(' · ')}</span></div>`).join('')}</div>`
       : `<p class="mu">Es la primera vez que hacés este ejercicio. Después de hoy vas a ver acá tu evolución.</p>`}
