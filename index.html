@@ -528,6 +528,8 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 #app.enter .ic{animation:pop .5s cubic-bezier(.2,.9,.3,1.3) .15s both}
 .pill2{font-size:13px;font-weight:750;padding:5px 10px;border-radius:99px;background:var(--acd);color:var(--ac);margin-right:6px;font-variant-numeric:tabular-nums}
 .pill2.down{background:rgba(255,107,107,.12);color:var(--dn)}
+html,body,*{scrollbar-width:none}
+::-webkit-scrollbar{display:none;width:0;height:0}
 </style>
 </head>
 <body>
@@ -548,7 +550,7 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '7.5';
+const KEY = 'entreno.v1', VERSION = '7.6';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2673,6 +2675,32 @@ $('#impf').addEventListener('change', async ev => {
 
 /* ---------- Hojas y avisos ---------- */
 let confirmCb = null, pickCb = null, pickQ = '';
+// Deslizar desde el borde izquierdo para volver, como en las apps del iPhone
+(() => {
+  const app = { els: () => [document.getElementById('app'), document.getElementById('nav')].filter(Boolean), set style(v) {} }; let x0 = null, y0 = 0, dx = 0, t0 = 0, on = false;
+  const sty = (k, v) => app.els().forEach(el => el.style[k] = v);
+  const backBtn = () => document.querySelector('#nav [data-a="back"], #app [data-a="back"], #nav [data-a="cancelEdit"], #app [data-a="cancelEdit"]');
+  document.addEventListener('touchstart', e => {
+    const t = e.touches[0]; x0 = null;
+    if (t.clientX > 28 || $('#modal').classList.contains('open') || R.view === 'workout' || !backBtn()) return;
+    x0 = t.clientX; y0 = t.clientY; dx = 0; t0 = Date.now(); on = false;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (x0 == null) return; const t = e.touches[0], ddx = t.clientX - x0, ddy = t.clientY - y0;
+    if (!on) { if (Math.abs(ddy) > 12 && Math.abs(ddy) > ddx) { x0 = null; return; } if (ddx < 10) return; on = true; sty('transition', 'none'); }
+    dx = Math.max(0, ddx); sty('transform', `translateX(${dx}px)`); sty('opacity', String(1 - Math.min(.5, dx / window.innerWidth * .6)));
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  const end = () => {
+    if (x0 == null) return; x0 = null; if (!on) return; on = false;
+    const v = dx / Math.max(1, Date.now() - t0), go = dx > window.innerWidth * .33 || (dx > 50 && v > .45);
+    sty('transition', 'transform .22s cubic-bezier(.2,.8,.2,1), opacity .22s ease');
+    if (go) { sty('transform', 'translateX(100%)'); sty('opacity', '0');
+      setTimeout(() => { const b = backBtn(); sty('transition', 'none'); sty('transform', ''); sty('opacity', ''); if (b) b.click(); }, 200); }
+    else { sty('transform', ''); sty('opacity', ''); }
+  };
+  document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
+})();
 // Deslizar la ventana hacia abajo para cerrarla (desde la barrita o cuando el contenido está arriba de todo)
 (() => {
   const sh = document.getElementById('sheet'); let y0 = null, dy = 0, t0 = 0, top = false;
