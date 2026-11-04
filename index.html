@@ -175,7 +175,8 @@ textarea{resize:vertical;min-height:56px}
 #modal .sheet{transform:translateY(105%);transition:transform .42s cubic-bezier(.2,.9,.25,1)}
 #modal.open .sheet{transform:none}
 .sheet{background:var(--s1);border-radius:26px 26px 0 0;width:100%;max-width:600px;max-height:86vh;overflow:auto;padding:10px 20px calc(20px + env(safe-area-inset-bottom))}
-.sheet:before{content:"";display:block;width:38px;height:5px;border-radius:5px;background:var(--s3);margin:0 auto 14px}
+.sheet:before{content:"";display:block;width:38px;height:5px;border-radius:5px;background:var(--s3);margin:0 auto 14px;box-shadow:0 0 0 14px transparent}
+.sheet.drag{transition:none!important}
 .sheet .big{background:var(--s2)}
 .sheet .big.pri{background:var(--ac)}
 .sheet .big.dangerbtn{background:var(--dn)}
@@ -500,7 +501,7 @@ details.tech li{margin:4px 0}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.8';
+const KEY = 'entreno.v1', VERSION = '6.9';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2516,6 +2517,19 @@ $('#impf').addEventListener('change', async ev => {
 
 /* ---------- Hojas y avisos ---------- */
 let confirmCb = null, pickCb = null, pickQ = '';
+// Deslizar la ventana hacia abajo para cerrarla (desde la barrita o cuando el contenido está arriba de todo)
+(() => {
+  const sh = document.getElementById('sheet'); let y0 = null, dy = 0, t0 = 0, top = false;
+  sh.addEventListener('touchstart', e => { const ty = e.touches[0].clientY; top = ty - sh.getBoundingClientRect().top < 48; if (!top && sh.scrollTop > 0) return; y0 = ty; dy = 0; t0 = Date.now(); }, { passive: true });
+  sh.addEventListener('touchmove', e => {
+    if (y0 == null) return; const d = e.touches[0].clientY - y0;
+    if (d <= 0 || (!top && sh.scrollTop > 0)) { if (dy) { dy = 0; sh.style.transform = ''; } if (d < 0) y0 = null; return; }
+    dy = d; sh.classList.add('drag'); sh.style.transform = `translateY(${dy}px)`; if (top && e.cancelable) e.preventDefault();
+  }, { passive: false });
+  const end = () => { if (y0 == null) return; y0 = null; sh.classList.remove('drag'); const v = dy / Math.max(1, Date.now() - t0);
+    if (dy > 110 || (dy > 30 && v > .5)) closeModal(); sh.style.transform = ''; dy = 0; };
+  sh.addEventListener('touchend', end); sh.addEventListener('touchcancel', end);
+})();
 function openModal(html) { clearTimeout(modalT); $('#sheet').innerHTML = html; $('#modal').classList.add('open'); $('#sheet').scrollTop = 0; }
 let modalT = 0;
 function closeModal() { $('#modal').classList.remove('open'); clearTimeout(modalT); modalT = setTimeout(() => { if (!$('#modal').classList.contains('open')) $('#sheet').innerHTML = ''; }, 450); }
@@ -2638,20 +2652,21 @@ const A = {
   exNew: () => { pickQ = ''; pickCb = () => { render(); toast('Ejercicio creado'); }; openModal(newExHtml()); },
   exEdit: d => {
     const e = exById(d.id); if (!e) return; eeMM = { ...exMus(e.id) };
-    const inR = S.routines.filter(r => r.items.some(it => it.exerciseId === e.id)).map(r => r.name);
+    const inR = [...new Set(S.routines.filter(r => !r.archived && r.items.some(it => it.exerciseId === e.id)).map(r => r.name))];
     openModal(`<div class="t" style="font-size:19px">Editar ejercicio</div>
       <label class="f"><span>Nombre</span><input id="ee_n" value="${esc(e.name)}"></label>
       <label class="f"><span>Músculo principal</span><select id="ee_m">${MUSCLES.map(m => `<option ${m === e.muscle ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
       <label class="f"><span>Equipamiento</span><select id="ee_e">${EQUIP.map(q => `<option ${q === exInfo(e).eq ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
       <div class="f"><span>Músculos que trabaja (para contar series)</span><div class="chips" id="ee_mm">${eeChips(e)}</div>
       <div class="mu sm" style="margin-top:6px">Tocá para cambiar: principal (cuenta 1) → secundario (½) → no trabaja.</div></div>
-      <label class="row f" style="gap:10px"><input type="checkbox" id="ee_u" style="width:auto" ${e.unilateral ? 'checked' : ''}> <span style="margin:0;font-size:15px;color:var(--tx)">Unilateral (se registra por lado)</span></label>
+      <button class="toggle ${e.unilateral ? 'on' : ''}" id="ee_u" data-a="eeUni"><span class="sp"><b>Unilateral</b><br><span class="mu sm">Se hace con un brazo o una pierna a la vez</span></span><span class="sw"><i></i></span></button>
       ${inR.length ? `<p class="mu sm">En: ${esc(inR.join(', '))}</p>` : ''}
       <button class="big pri" data-a="exSave" data-id="${e.id}">Guardar</button>
       <button class="big" data-a="openEx" data-id="${e.id}">Ver progreso</button>
       ${inR.length ? '' : `<button class="big ghost danger" data-a="exDel" data-id="${e.id}">Eliminar ejercicio</button>`}
       <button class="big ghost" data-a="closeModal">Cancelar</button>`);
   },
+  eeUni: (d, el) => el.classList.toggle('on'),
   eeMus: d => { const w = eeMM[d.k] || 0, nw = w >= 1 ? .5 : w ? 0 : 1; if (nw) eeMM[d.k] = nw; else delete eeMM[d.k]; $('#ee_mm').innerHTML = eeChips(); },
   exFav: d => { const e = exById(d.id); if (!e) return; e.fav = !e.fav; e.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(e.fav ? 'Agregado a favoritos ★' : 'Quitado de favoritos'); },
   exMF: d => { exMF = d.k; const l = $('#exlist'); render(); },
@@ -2659,7 +2674,7 @@ const A = {
   exSave: d => {
     const e = exById(d.id), n = $('#ee_n').value.trim(); if (!n) { toast('Escribí un nombre'); return; }
     if (S.exercises.some(x => x.id !== e.id && norm(x.name) === norm(n))) { toast('Ya existe un ejercicio con ese nombre'); return; }
-    e.name = n; e.muscle = $('#ee_m').value; e.unilateral = $('#ee_u').checked; e.u = Date.now();
+    e.name = n; e.muscle = $('#ee_m').value; e.unilateral = $('#ee_u').classList.contains('on'); e.u = Date.now();
     const eq = $('#ee_e').value, I = INFO[norm(n)]; if (I && I[0] === eq) delete e.eq; else e.eq = eq;
     if (eeMM && JSON.stringify(eeMM) !== JSON.stringify(MMAP[norm(n)] || null)) e.mm = eeMM; else if (eeMM) delete e.mm;
     renameEverywhere(e.id, e); closeModal(); save(); render(); toast('Ejercicio actualizado');
