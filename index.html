@@ -442,6 +442,11 @@ button.tile{color:inherit;font:inherit}
 .opt b{display:block;margin-bottom:4px;font-size:15px}
 .opt.on{border-color:var(--ac);background:var(--acd)}
 .tile b.up{color:var(--ac)}
+.sslink{display:block;width:100%;margin:-4px 0 12px;padding:9px;border-radius:12px;background:none;border:1.5px dashed var(--ln);color:var(--mu);font-size:13.5px;font-weight:600}
+.sslink.on{border-style:solid;border-color:var(--ac);color:var(--ac);background:var(--acd)}
+.ssbadge{display:inline-block;margin:10px 0 2px;padding:6px 11px;border-radius:99px;background:var(--acd);color:var(--ac);font-size:12.5px;font-weight:650}
+.cbadge.stall,.cb.stall{color:#ff7ab6}.cbadge.stall{background:rgba(255,122,182,.12)}
+.cbadge.deload,.cb.deload{color:#7fd3ff}.cbadge.deload{background:rgba(127,211,255,.12)}
 </style>
 </head>
 <body>
@@ -462,7 +467,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.4';
+const KEY = 'entreno.v1', VERSION = '6.5';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -618,10 +623,40 @@ function progCtx(p = activeProg()) {
   const ph = p.phases[idx], now = weekStart(), cal = S.settings.weekMode === 'cal', need = weekNeed(ph);
   let w, skipped = 0;
   if (cal) w = Math.max(1, Math.round((now - p.cur.ws) / WEEK) + 1);
-  else { let n = 0; for (let t = p.cur.ws; t < now; t = addDays(t, 7)) { if (weekCount(t) >= need) n++; else skipped++; } w = n + 1; }
+  else { let n = 0; for (let t = p.cur.ws; t < now; t = addDays(t, 7)) { if (S.deloadWk === t) continue; if (weekCount(t) >= need) n++; else skipped++; } w = n + 1; }
   return { prog: p, ph, idx, w, wEff: Math.min(w, ph.weeks), done: w > ph.weeks, next: p.phases[idx + 1] || null, cal, need, skipped, thisWk: weekCount(now) };
 }
 // Ajuste de cada semana: regla automática (+% por semana) que se puede pisar a mano
+// Semana de descarga elegida por vos (no planificada en la fase): no cuenta como semana de la fase
+const deloadNow = () => S.deloadWk === weekStart();
+// Estancamiento: 3 o más sesiones sin superar tu mejor máximo estimado (y sin haber bajado el peso a propósito hace poco)
+function stallInfo(exId, before = Infinity) {
+  const ser = exSeries(exId).filter(x => x.date < before).slice(-9); if (ser.length < 4) return null;
+  let bi = 0; ser.forEach((x, i) => { if (x.e1 > ser[bi].e1 * 1.005) bi = i; });
+  const n = ser.length - 1 - bi; if (n < 3) return null;
+  for (let i = Math.max(1, ser.length - 3); i < ser.length; i++) if (ser[i].maxW <= ser[i - 1].maxW * 0.93) return null;
+  return { n, best: ser[bi].e1 };
+}
+// ¿Varios ejercicios frenados o rindiendo menos a la vez? Señal de cansancio acumulado
+function deloadAdvice() {
+  if (deloadNow() || Date.now() < (S.deloadSnooze || 0) || (S.deloadWk && S.deloadWk > weekStart() - 4 * WEEK)) return null;
+  const c = progCtx(); if (c && weekParams(c.ph, c.wEff).deload) return null;
+  const last = S.sessions[S.sessions.length - 1]; if (!last || Date.now() - last.start > 14 * 864e5) return null;
+  const ids = [...new Set(planDays().flatMap(r => r.items.map(i => i.exerciseId)))];
+  let ev = 0, bad = 0;
+  ids.forEach(id => { const ser = exSeries(id); if (ser.length < 4) return; ev++;
+    const best = Math.max(...ser.slice(-9).map(x => x.e1));
+    if (stallInfo(id) || ser[ser.length - 1].e1 < best * 0.95) bad++; });
+  return ev >= 3 && bad >= 3 && bad / ev >= 0.4 ? { bad, ev } : null;
+}
+function deloadCard() {
+  if (deloadNow()) return `<div class="card row"><div style="font-size:26px">🔋</div><div class="sp"><div class="t">Semana de descarga</div>
+    <div class="mu sm">Una serie menos y ~85% del peso, lejos del fallo. No cuenta como semana de la fase.</div></div><button class="sm ghost" data-a="deloadOff">Cancelar</button></div>`;
+  const d = deloadAdvice(); if (!d) return '';
+  return `<div class="card hl"><div class="row" style="align-items:flex-start"><div style="font-size:28px">🔋</div><div class="sp"><div class="t">Tu cuerpo pide una semana de descarga</div>
+    <div class="mu sm">En ${d.bad} de ${d.ev} ejercicios no estás mejorando o rendiste menos que antes. Una semana más liviana suele destrabarlo: recuperás y volvés más fuerte.</div></div></div>
+    <div class="row" style="gap:8px;margin-top:12px"><button class="pri sp" data-a="deloadOn">Hacer descarga esta semana</button><button class="ghost" data-a="deloadSnooze">Ahora no</button></div></div>`;
+}
 // Para que una semana cuente hay que hacer al menos la mitad de los días de la fase
 const weekNeed = ph => Math.max(1, Math.ceil((ph.days.length || 2) / 2));
 function weekStatus(c) {
@@ -639,7 +674,8 @@ function weekParams(ph, w) {
   return { dp, ds, deload, auto, custom: o.dp !== undefined && o.dp !== '' && o.dp !== null };
 }
 function prescribe(it, ph, w) {
-  const p = ph ? weekParams(ph, w) : { dp: 0, ds: 0, deload: false };
+  let p = ph ? weekParams(ph, w) : { dp: 0, ds: 0, deload: false };
+  if (deloadNow() && !p.deload) p = { ...p, dp: (p.dp || 0) - 12, ds: -1, deload: true };
   const base = num(it.pct);
   return { sets: Math.max(1, (+it.sets || 3) + p.ds), repMin: it.repMin, repMax: it.repMax, rest: it.rest,
     pct: Number.isFinite(base) && base > 0 ? Math.round((base + p.dp) * 10) / 10 : null,
@@ -662,7 +698,7 @@ function curE1(exId, before = Infinity) {
 }
 const roundTo = (v, st) => r2(Math.round(v / st) * st);
 // Qué peso usar la próxima vez y por qué (doble progresión + % + repeticiones en reserva)
-const CB = { up: '↑ Subir', down: '↓ Bajar', keep: '= Mantener', pct: 'Según %', new: 'Primera vez' };
+const CB = { up: '↑ Subir', down: '↓ Bajar', keep: '= Mantener', pct: 'Según %', new: 'Primera vez', stall: '⟲ Reiniciar', deload: '🔋 Descarga' };
 function coach(exId, rx, before = Infinity) {
   rx = rx || {};
   const step = S.settings.step, target = rx.rir ?? 2, repMin = rx.repMin || 8, repMax = rx.repMax || 12;
@@ -679,10 +715,17 @@ function coach(exId, rx, before = Infinity) {
   const rirs = sets.map(x => x.rir).filter(v => v != null), easy = rirs.length >= Math.ceil(sets.length / 2) && rirs.reduce((a, b) => a + b, 0) / rirs.length >= target + 2;
   const low = sets.filter(x => x.r < repMin).length > sets.length / 2;
   const seen = sets.map(x => (x.w ? fmtNum(x.w) + '×' : '') + x.r).join(', ');
+  if (rx.deload && lw > 0) { const w = roundTo(lw * 0.85, step);
+    return { w, kind: 'deload', short: `Semana de descarga: ${fmtNum(w)} ${u}, lejos del fallo`,
+      msg: `Esta semana es de descarga: bajás la carga para que el cuerpo recupere y después rindas más. Usá ${fmtNum(w)} ${u} (más o menos 85% de lo último) y terminá cada serie sintiendo que te quedaban 3 o más.` }; }
   if (lw > 0 && (allTop || easy)) return { w: r2(lw + step), kind: 'up', short: `${allTop ? `Llegaste a ${repMax} en todas` : 'Te sobraban repeticiones'}: subí ${fmtNum(step)} ${u}`,
     msg: `La última vez hiciste ${seen}. ${allTop ? `Llegaste a ${repMax} repeticiones en todas las series` : 'Te sobraban más repeticiones de las indicadas'}: es momento de subir ${fmtNum(step)} ${u}. Con el peso nuevo vas a hacer menos repeticiones; está bien, volvés a construir hasta ${repMax}.` };
   if (lw > 0 && low) return { w: r2(Math.max(0, lw - step)), kind: 'down', short: `No llegaste a ${repMin} en la mayoría: bajá ${fmtNum(step)} ${u}`,
     msg: `La última vez hiciste ${seen}: en la mayoría de las series no llegaste a ${repMin}. Bajá ${fmtNum(step)} ${u} para entrenar en el rango correcto y volvé a subir cuando llegues a ${repMax}.` };
+  const st = stallInfo(exId, before);
+  if (lw > 0 && st) { const w = roundTo(lw * 0.9, step);
+    return { w, kind: 'stall', short: `${st.n} sesiones sin mejorar: bajá a ${fmtNum(w)} y volvé a subir`,
+      msg: `Hace ${st.n} sesiones que no superás tu mejor marca (máximo estimado ${Math.round(st.best)} ${u}). Es normal y tiene arreglo: bajá a ${fmtNum(w)} ${u} (10% menos) y volvé a subir de a poco sumando repeticiones. En 2 o 3 semanas solés pasar la marca anterior. Si sigue igual, probá cambiar el rango de repeticiones o reemplazarlo un tiempo por una variante.` }; }
   return { w: lw || null, kind: 'keep', short: 'Mismo peso: buscá una repetición más que la última vez',
     msg: `La última vez hiciste ${seen}. Mantené ${lw ? fmtNum(lw) + ' ' + u : 'el mismo peso'} y tratá de sumar una repetición por serie. Cuando llegues a ${repMax} en todas, la app te va a decir que subas.` };
 }
@@ -713,12 +756,13 @@ function vCoach() {
       <button class="link" style="margin-top:10px" data-a="weekMode">Cómo avanzan las semanas ›</button></div>`;
     if (c.done) h += phaseDoneCard(c);
   }
+  h += deloadCard();
   if (!days.length) return h + `<div class="card mu">Cuando tengas días en tu plan, acá vas a ver qué peso usar en cada ejercicio.</div>`;
   const ph = c ? c.ph : null, w = c ? c.wEff : 1, all = days.flatMap(r => r.items.map(it => ({ r, it, k: coach(it.exerciseId, prescribe(it, ph, w)).kind })));
   const n = kd => all.filter(x => x.k === kd).length;
-  const F = [['all', 'Todos', all.length], ['up', '↑ Subir', n('up')], ['keep', '= Mantener', n('keep') + n('pct')], ['down', '↓ Bajar', n('down')], ['new', 'Primera vez', n('new')]].filter(f => f[0] === 'all' || f[2]);
+  const F = [['all', 'Todos', all.length], ['up', '↑ Subir', n('up')], ['keep', '= Mantener', n('keep') + n('pct')], ['down', '↓ Bajar', n('down')], ['stall', '⟲ Estancados', n('stall')], ['deload', '🔋 Descarga', n('deload')], ['new', 'Primera vez', n('new')]].filter(f => f[0] === 'all' || f[2]);
   if (!F.some(f => f[0] === coachF)) coachF = 'all';
-  h += `<div class="tiles"><div class="tile"><b class="up">${n('up')}</b><span>Para subir</span></div><div class="tile"><b>${n('keep') + n('pct')}</b><span>Mantener</span></div><div class="tile"><b style="color:${n('down') ? '#ffb347' : ''}">${n('down')}</b><span>Para bajar</span></div></div>`;
+  h += `<div class="tiles"><div class="tile"><b class="up">${n('up')}</b><span>Para subir</span></div><div class="tile"><b>${n('keep') + n('pct')}</b><span>Mantener</span></div><div class="tile"><b style="color:${n('down') + n('stall') ? '#ffb347' : ''}">${n('down') + n('stall')}</b><span>Para revisar</span></div></div>`;
   h += `<div class="chips" style="margin:18px 0 4px">${F.map(f => `<button class="chip ${coachF === f[0] ? 'on' : ''}" data-a="coachF" data-k="${f[0]}">${f[1]} · ${f[2]}</button>`).join('')}</div>`;
   const match = k => coachF === 'all' || k === coachF || (coachF === 'keep' && k === 'pct');
   days.forEach(r => {
@@ -732,6 +776,8 @@ function vCoach() {
     <p style="margin-top:0"><b class="up">↑ Subir</b> cuando llegaste al máximo de repeticiones en todas las series, o te sobraban muchas.</p>
     <p><b>= Mantener</b> cuando estás dentro del rango: mismo peso y buscá una repetición más.</p>
     <p><b style="color:#ffb347">↓ Bajar</b> cuando en la mayoría de las series no llegaste al mínimo.</p>
+    <p><b style="color:#ff7ab6">⟲ Reiniciar</b> cuando pasaron 3 sesiones sin superar tu mejor marca: bajás 10% y volvés a construir.</p>
+    <p><b>🔋 Descarga</b> cuando varios ejercicios se frenan a la vez: una semana liviana para recuperar.</p>
     <p style="margin-bottom:0"><b style="color:#9b8cff">Según %</b> cuando la fase pide un porcentaje: se calcula con tu máximo estimado, que se actualiza en cada entrenamiento.</p></div>
     <p class="mu sm c">Tocá un ejercicio para ver su evolución y la tabla de pesos.</p>`;
   return h;
@@ -1215,6 +1261,7 @@ function vHome() {
   else if (sti.n < (S.lastStreak || 0)) { if (sti.n <= trainedDays(weekStart()).size) S.lostStreak = S.lastStreak; S.lastStreak = sti.n; save(false); }
   if (S.lostStreak) h += `<div class="card row lost"><div style="font-size:30px">💔</div><div class="sp"><div class="t">Perdiste tu racha de ${S.lostStreak} ${dias(S.lostStreak)}</div>
     <div class="mu sm">La semana pasada no llegaste a tu objetivo. Cada día que entrenes vuelve a sumar 🔥</div></div><button class="ghost" data-a="dismissLost" aria-label="Cerrar">✕</button></div>`;
+  if (!S.active) h += deloadCard();
   const lbk = S.settings.lastBackup || 0;
   if (S.sessions.length && !S.active && Date.now() - lbk > WEEK && Date.now() > (S.backupSnooze || 0)) {
     const ago = lbk ? Math.floor((Date.now() - lbk) / 864e5) : 0;
@@ -1449,6 +1496,7 @@ function vEdit() {
         <label><span>Peso ref.</span><input inputmode="decimal" data-f="it" data-k="startW" data-i="${i}" value="${esc(fmtNum(it.startW))}" placeholder="—"></label>
       </div>
       <input data-f="it" data-k="notes" data-i="${i}" value="${esc(it.notes)}" placeholder="Notas: agarre, asiento, técnica…" style="margin-top:8px"></div>`;
+    if (i < d.items.length - 1) h += `<button class="sslink ${it.ss ? 'on' : ''}" data-a="itSS" data-i="${i}">${it.ss ? '⛓ Superserie con el siguiente · tocá para separar' : '+ Hacer superserie con el siguiente'}</button>`;
   });
   h += `<button class="big" style="background:var(--s1)" data-a="pickForRoutine">+ Añadir ejercicio</button>`;
   return h;
@@ -1508,6 +1556,8 @@ function vExercise() {
     <div class="bigstat" style="font-size:42px;margin-top:6px">${k.w ? fmtNum(k.w) + `<span class="mu" style="font-size:20px;font-weight:600"> ${u}</span>` : '—'}</div>
     ${rx ? `<div class="mu sm" style="margin-top:4px">${rx.sets} series × ${repsTxt(rx.repMin, rx.repMax)} reps${rx.rir != null ? ` · dejando ${rx.rir} en reserva` : ''}</div>` : ''}</div>
     <span class="cbadge ${k.kind}">${CB[k.kind]}</span></div><p class="sm" style="margin:14px 0 0;line-height:1.5">${esc(k.msg)}</p></div>`;
+  const alts = ((ex && ex.alts) || []).map(exById).filter(Boolean);
+  if (alts.length) h += `<div class="row" style="gap:8px;flex-wrap:wrap;margin:-4px 0 16px"><span class="mu sm">Alternativas:</span>${alts.map(x => `<button class="chip" data-a="openEx" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`;
   if (!ser.length) return h + `<div class="card mu">Todavía no registraste este ejercicio. Después del primer entrenamiento vas a ver acá tu máximo estimado y su evolución.</div>`;
   const e1 = curE1(id), e1m = curE1(id, Date.now() - 28 * 864e5), dm = e1 && e1m ? pct(e1, e1m) : null;
   const best = ser.reduce((b, x) => x.e1 > b.e1 ? x : b, ser[0]), maxW = Math.max(...ser.map(x => x.maxW)), d = pct(ser[ser.length - 1].e1, ser[0].e1);
@@ -1528,6 +1578,13 @@ function vExercise() {
 }
 /* ---------- Entrenamiento guiado ---------- */
 const pending = e => !e.skipped && e.sets.some(s => !s.done);
+// Superserie: ejercicios encadenados (cada uno marca si va unido al siguiente)
+function ssGroup(a, i) {
+  const X = a.exercises; let s = i, t = i;
+  while (s > 0 && X[s - 1].ssNext) s--;
+  while (t < X.length - 1 && X[t].ssNext) t++;
+  return Array.from({ length: t - s + 1 }, (_, k) => s + k);
+}
 function nextPending(a, from) {
   const n = a.exercises.length;
   for (let k = 1; k <= n; k++) { const i = (from + k) % n; if (i !== from && pending(a.exercises[i])) return i; }
@@ -1545,9 +1602,9 @@ function sug(e, j, last) {
     hint = `${fmtNum(e.pct)}% de tu máximo estimado (${Math.round(e1)} ${unit()})${e.rir != null ? ` · terminá con ${e.rir} ${e.rir === 1 ? 'repetición' : 'repeticiones'} en reserva` : ''}`;
   } else if (last) {
     const ls = last.sets[j] || last.sets[last.sets.length - 1];
-    const k = coach(e.exerciseId, { sets: e.plannedSets, repMin: e.repMin, repMax: e.repMax, rir: e.rir }, S.active ? S.active.start : Infinity);
+    const k = coach(e.exerciseId, { sets: e.plannedSets, repMin: e.repMin, repMax: e.repMax, rir: e.rir, deload: S.active && S.active.wk ? S.active.wk.deload : deloadNow() }, S.active ? S.active.start : Infinity);
     w = k.w ?? ls.w; hint = k.short;
-    r = k.kind === 'up' || k.kind === 'down' ? e.repMin : Math.max(e.repMin, Math.min(e.repMax, ls.r + 1));
+    r = ['up', 'down', 'stall', 'deload'].includes(k.kind) ? e.repMin : Math.max(e.repMin, Math.min(e.repMax, ls.r + 1));
   } else if (e.startW != null && e.startW !== '') { w = e.startW; hint = 'Peso de referencia'; }
   else if (e.pct || e.rir != null) hint = `Elegí un peso con el que te queden ~${target} repeticiones en reserva. Con esta serie la app aprende tu máximo.`;
   if (j > 0 && e.sets[j - 1].done) {
@@ -1558,6 +1615,7 @@ function sug(e, j, last) {
   return { w, r, hint, adj };
 }
 function curVals(e, j, g) { const s = e.sets[j]; return { w: s.w !== '' ? s.w : g.w, r: s.r !== '' ? s.r : g.r }; }
+const elapsedMs = a => (a.paused || Date.now()) - a.start;
 function wkTotals(a) {
   let tot = 0, dn = 0, vol = 0, prs = 0;
   a.exercises.forEach(e => { if (e.skipped) return; tot += e.sets.length; e.sets.forEach(s => { if (s.done) { dn++; vol += s.w * s.r; if (s.pr) prs++; } }); });
@@ -1571,20 +1629,23 @@ function vWorkout() {
   const T = wkTotals(a);
   const allDone = a.exercises.length > 0 && !a.exercises.some(pending);
   let h = `<div class="head"><button class="ghost" data-a="wkMenu" aria-label="Menú" style="font-size:20px;padding:8px 10px">✕</button>
-    <div class="sp c"><div class="t" style="font-size:16px">${esc(a.name)}</div><div class="mu sm" style="font-variant-numeric:tabular-nums"><span id="elapsed">${fmtClock(Date.now() - a.start)}</span> · ${T.dn}/${T.tot} series</div></div>
+    <div class="sp c"><div class="t" style="font-size:16px">${esc(a.name)}</div><div class="mu sm" style="font-variant-numeric:tabular-nums"><span id="elapsed">${fmtClock(elapsedMs(a))}</span>${a.paused ? ' · en pausa' : ''} · ${T.dn}/${T.tot} series</div></div>
     <button class="${allDone ? 'pri' : ''}" style="${allDone ? '' : 'background:var(--s1)'}" data-a="finish">Terminar</button></div>
     <div class="bar"><i style="width:${T.tot ? T.dn / T.tot * 100 : 0}%"></i></div>`;
+  if (a.paused) return h + `<div class="fin"><div class="emoji">⏸</div><div class="exname">En pausa</div>
+    <p class="mu">El tiempo está frenado. Tomate lo que necesites: todo lo que hiciste queda guardado.</p>
+    <button class="pri big cta" data-a="wkResume">Reanudar</button></div>`;
   if (!a.exercises.length) return h + `<div class="fin"><div class="emoji">🏋️</div><div class="exname">Sesión libre</div>
     <p class="mu">Elegí el primer ejercicio para empezar.</p><button class="pri big cta" data-a="wkAdd">+ Añadir ejercicio</button></div>`;
   h += `<div class="pills" id="pills">${a.exercises.map((e, i) => {
     const d = e.sets.length && e.sets.every(s => s.done);
-    return `<button class="pill ${i === a.cur ? 'on' : ''} ${d ? 'dn' : ''} ${e.skipped ? 'sk' : ''}" data-a="jump" data-i="${i}">${d ? '✓ ' : ''}${esc(e.name)}</button>`;
+    return `<button class="pill ${i === a.cur ? 'on' : ''} ${d ? 'dn' : ''} ${e.skipped ? 'sk' : ''}" data-a="jump" data-i="${i}">${d ? '✓ ' : ''}${esc(e.name)}${e.ssNext ? ' ⛓' : ''}</button>`;
   }).join('')}</div>`;
 
   if (allDone && !peek) {
     const sk = a.exercises.map((e, i) => ({ e, i })).filter(x => x.e.skipped);
     h += `<div class="fin"><div class="emoji">💪</div><div class="exname">¡Listo!</div><p class="mu">Completaste todas las series.</p></div>
-      <div class="sumgrid"><div class="tile"><b>${fmtDur(Date.now() - a.start)}</b><span>Duración</span></div><div class="tile"><b>${T.dn}</b><span>Series</span></div><div class="tile"><b>${fmtBig(T.vol)}</b><span>Volumen</span></div></div>
+      <div class="sumgrid"><div class="tile"><b>${fmtDur(elapsedMs(a))}</b><span>Duración</span></div><div class="tile"><b>${T.dn}</b><span>Series</span></div><div class="tile"><b>${fmtBig(T.vol)}</b><span>Volumen</span></div></div>
       ${T.prs ? `<div class="card c" style="margin-top:8px"><span class="badge gold" style="font-size:14px">🏆 ${T.prs} ${T.prs === 1 ? 'récord nuevo' : 'récords nuevos'}</span></div>` : ''}
       <button class="pri big cta" style="margin-top:18px" data-a="finishNow">Guardar entrenamiento</button>
       ${sk.length ? `<h2>Omitidos</h2>` + sk.map(x => `<div class="card row"><div class="sp">${esc(x.e.name)}</div><button class="sm" data-a="unskip" data-i="${x.i}">Hacerlo ahora</button></div>`).join('') : ''}
@@ -1596,7 +1657,9 @@ function vWorkout() {
   h += `<div class="exmeta kicker swapme">${i + 1} de ${a.exercises.length}${e.muscle ? ' · ' + esc(e.muscle) : ''}</div>
     <div class="exname clickable swapme" data-a="exHist">${esc(e.name)}</div>
     <div class="mu swapme">${e.plannedSets} × ${repsTxt(e.repMin, e.repMax)} reps${e.unilateral ? ' por lado' : ''} · descanso ${fmtRest(e.rest)}</div>`;
-  const rx = [a.wk ? `Semana ${a.wk.w} de ${a.wk.n}${a.wk.deload ? ' · descarga' : ''}` : '', e.pct ? fmtNum(e.pct) + '%' : '', e.rir != null ? 'RIR ' + e.rir : ''].filter(Boolean);
+  const gp = ssGroup(a, i), ssw = gp.length > 1 ? gp.filter(q => q !== i).map(q => a.exercises[q].name).join(' + ') : '';
+  if (ssw) h += `<div class="ssbadge swapme">⛓ Superserie con ${esc(ssw)} · descanso al terminar la vuelta</div>`;
+  const rx = [a.wk ? (a.wk.free ? 'Semana de descarga' : `Semana ${a.wk.w} de ${a.wk.n}${a.wk.deload ? ' · descarga' : ''}`) : '', e.pct ? fmtNum(e.pct) + '%' : '', e.rir != null ? 'RIR ' + e.rir : ''].filter(Boolean);
   if (rx.length) h += `<div class="rx swapme">${rx.map(x => `<span>${x}</span>`).join('')}${e.pct || e.rir != null ? '<button class="rxi" data-a="rxInfo" aria-label="Qué significa">?</button>' : ''}</div>`;
   if (e.notes) h += `<div class="note">${esc(e.notes)}</div>`;
 
@@ -1636,9 +1699,9 @@ function centerPill() {
 function startSession(r) {
   const f = r && r.phaseId ? findPhase(r.phaseId) : null, c = f && f.prog.active ? progCtx(f.prog) : null;
   const ph = f ? f.ph : null, w = c && c.ph.id === ph.id ? c.wEff : 1;
-  const exs = r ? r.items.map(it => { const p = prescribe(it, ph, w); return mkWkEx(it.exerciseId, p.sets, p.repMin, p.repMax, p.rest, it.notes, it.startW, p.pct, p.rir); }) : [];
+  const exs = r ? r.items.map((it, k) => { const p = prescribe(it, ph, w), x = mkWkEx(it.exerciseId, p.sets, p.repMin, p.repMax, p.rest, it.notes, it.startW, p.pct, p.rir); if (it.ss && k < r.items.length - 1) x.ssNext = true; return x; }) : [];
   S.active = { id: uid(), routineId: r ? r.id : null, name: r ? r.name : 'Sesión libre', start: Date.now(), exercises: exs, restEnd: 0, restTotal: 0, cur: 0,
-    wk: ph ? { w, n: ph.weeks, deload: weekParams(ph, w).deload, ph: ph.name } : null };
+    wk: ph ? { w, n: ph.weeks, deload: weekParams(ph, w).deload || deloadNow(), ph: ph.name } : (deloadNow() ? { w: 1, n: 1, deload: true, ph: '', free: true } : null) };
   save(); go('workout');
 }
 function mkWkEx(exId, sets, repMin, repMax, rest, notes, startW, pct = null, rir = null) {
@@ -1653,7 +1716,7 @@ function finishSession() {
     sets: e.sets.filter(s => s.done).map(s => { const o = { w: num(s.w), r: Math.round(num(s.r)) }; if (s.pr) o.pr = true; if (s.rir != null) o.rir = s.rir; return o; })
       .filter(s => Number.isFinite(s.w) && Number.isFinite(s.r) && s.r > 0)
   })).filter(e => e.sets.length);
-  const sess = { id: a.id, routineId: a.routineId, name: a.name, start: a.start, end: Date.now(), exercises: exs };
+  const sess = { id: a.id, routineId: a.routineId, name: a.name, start: a.start, end: a.paused || Date.now(), exercises: exs };
   if (a.wk) sess.phase = `${a.wk.ph} · semana ${a.wk.w}`;
   S.sessions.push(sess); S.sessions.sort((x, y) => x.start - y.start);
   S.active = null; save();
@@ -1728,7 +1791,7 @@ function renderRest() {
     <button class="pri big cta" data-a="restSkip" style="margin-top:14px">Saltar descanso</button></div>`;
 }
 setInterval(() => {
-  if (R.view === 'workout' && S.active) { const el = $('#elapsed'); if (el) el.textContent = fmtClock(Date.now() - S.active.start); renderRest(); }
+  if (R.view === 'workout' && S.active) { const el = $('#elapsed'); if (el) el.textContent = fmtClock(elapsedMs(S.active)); renderRest(); }
 }, 1000);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) return;
@@ -2191,6 +2254,7 @@ function newExHtml() {
 }
 
 /* ---------- Acciones ---------- */
+const a0 = () => S.active || {};
 const curEx = () => { const a = S.active; ensureCur(a); return a.exercises[a.cur]; };
 function wkRender() { save(); render(); window.scrollTo(0, 0); }
 const A = {
@@ -2374,6 +2438,9 @@ const A = {
       <button class="big" data-a="startFree">Sesión libre</button>`);
   },
   openCoach: () => go('coach'),
+  deloadOn: () => { S.deloadWk = weekStart(); S.updatedAt = Date.now(); save(); render(); toast('Semana de descarga activada 🔋'); },
+  deloadOff: () => { S.deloadWk = 0; S.updatedAt = Date.now(); save(); render(); toast('Descarga cancelada'); },
+  deloadSnooze: () => { S.deloadSnooze = Date.now() + 7 * 864e5; save(false); render(); },
   snoozeBackup: () => { S.backupSnooze = Date.now() + 3 * 864e5; save(false); render(); toast('Te lo recuerdo en unos días'); },
   coachF: d => { coachF = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   weekMode: () => {
@@ -2578,6 +2645,7 @@ const A = {
   },
   toggleDay: d => { const k = +d.k; draft.days = draft.days.includes(k) ? draft.days.filter(x => x !== k) : [...draft.days, k]; render(); },
   itMove: d => { const i = +d.i, j = i + (+d.d), it = draft.items; if (j < 0 || j >= it.length) return; [it[i], it[j]] = [it[j], it[i]]; render(); },
+  itSS: d => { const it = draft.items[+d.i]; it.ss = !it.ss; const y = window.scrollY; render(); window.scrollTo(0, y); },
   itDel: d => { draft.items.splice(+d.i, 1); render(); },
   pickForRoutine: () => openPicker(id => {
     const f = draft.phaseId && findPhase(draft.phaseId), t = f ? tplOf(f.ph) : {};
@@ -2640,8 +2708,15 @@ const A = {
     unlockAudio();
     justDone = { id: e.id, k: j }; a.lastDone = { i: a.cur, j };
     if (s.pr) { toast('🏆 ¡Nuevo récord!', true); beep([660, 880, 1320]); confetti(70); }
-    if (!e.sets.some(x => !x.done)) { const nx = nextPending(a, a.cur); if (nx >= 0) a.cur = nx; }
-    if (a.exercises.some(pending)) { a.restEnd = Date.now() + e.rest * 1000; a.restTotal = e.rest; $('#rest').innerHTML = ''; }
+    const grp = ssGroup(a, a.cur); let rest = true;
+    if (grp.length > 1) {
+      const pos = grp.indexOf(a.cur); let nx = -1;
+      for (let k = 1; k < grp.length; k++) { const q = grp[(pos + k) % grp.length]; if (pending(a.exercises[q])) { nx = q; break; } }
+      if (nx >= 0) { rest = grp.indexOf(nx) < pos; a.cur = nx; }
+      else if (!pending(e)) { const n2 = nextPending(a, a.cur); if (n2 >= 0) a.cur = n2; }
+    } else if (!e.sets.some(x => !x.done)) { const nx = nextPending(a, a.cur); if (nx >= 0) a.cur = nx; }
+    if (a.exercises.some(pending) && rest) { a.restEnd = Date.now() + e.rest * 1000; a.restTotal = e.rest; $('#rest').innerHTML = ''; }
+    else if (!rest && !s.pr) toast(`Superserie: seguí con ${a.exercises[a.cur].name}`);
     peek = false; wkRender();
   },
   undoSet: d => { const a = S.active, e = curEx(), s = e.sets[+d.k]; s.done = false; delete s.pr; delete s.rir; a.restEnd = 0; a.lastDone = null; peek = false; wkRender(); },
@@ -2694,8 +2769,24 @@ const A = {
   },
   unskip: d => { const a = S.active; a.exercises[+d.i].skipped = false; a.cur = +d.i; peek = false; wkRender(); },
   replaceEx: () => {
-    const a = S.active, i = a.cur, e = a.exercises[i]; closeModal();
-    openPicker(id => { a.exercises[i] = mkWkEx(id, e.sets.length, e.repMin, e.repMax, e.rest, ''); wkRender(); toast('Ejercicio cambiado'); });
+    const a = S.active, e = a.exercises[a.cur], ex = exById(e.exerciseId) || {}, alts = (ex.alts || []).map(exById).filter(Boolean);
+    const used = new Set(S.sessions.flatMap(s => s.exercises.map(x => x.exerciseId)));
+    const same = S.exercises.filter(x => x.id !== e.exerciseId && !alts.includes(x) && x.muscle && x.muscle === e.muscle).sort((x, y) => used.has(y.id) - used.has(x.id)).slice(0, 8);
+    const row = x => `<button class="pick" data-a="replWith" data-id="${x.id}"><span class="sp">${esc(x.name)}</span><span class="mu sm">${used.has(x.id) ? 'con historial' : ''}</span></button>`;
+    openModal(`<div class="row"><div class="sp"><div class="kicker" style="font-size:11px">Cambiar por hoy</div><div class="t" style="font-size:19px">${esc(e.name)}</div></div><button class="ghost" data-a="closeModal">Cerrar</button></div>
+      <p class="mu sm">Ideal si la máquina está ocupada. Se mantienen las series y repeticiones, y cada ejercicio guarda su propio historial.</p>
+      ${alts.length ? `<h2 style="margin-top:14px">Tus alternativas</h2>${alts.map(row).join('')}` : ''}
+      ${same.length ? `<h2 style="margin-top:14px">Mismo músculo · ${esc(e.muscle)}</h2>${same.map(row).join('')}` : ''}
+      <button class="big" data-a="replPick">Buscar otro ejercicio</button>`);
+  },
+  replPick: () => { closeModal(); openPicker(id => A.replWith({ id })); },
+  replWith: d => {
+    const a = S.active, i = a.cur, e = a.exercises[i], id = d.id; closeModal();
+    const nx = mkWkEx(id, e.sets.length, e.repMin, e.repMax, e.rest, '', null, e.pct, e.rir); if (e.ssNext) nx.ssNext = true;
+    a.exercises[i] = nx;
+    const o = exById(e.exerciseId), n = exById(id);
+    if (o && n && o.id !== n.id) { [[o, n], [n, o]].forEach(([x, y]) => { x.alts = [...new Set([y.id, ...(x.alts || [])])].slice(0, 6); x.u = Date.now(); }); }
+    wkRender(); toast('Cambiado · queda guardado como alternativa');
   },
   wkRemove: () => {
     const a = S.active; closeModal(); a.exercises.splice(a.cur, 1);
@@ -2706,10 +2797,13 @@ const A = {
     const a = S.active; a.exercises.push(mkWkEx(id, 3, 8, 10, S.settings.rest, '')); a.cur = a.exercises.length - 1; peek = false; wkRender();
   }),
   wkMenu: () => openModal(`<div class="t" style="font-size:19px">Entrenamiento en curso</div><p class="mu">Todo lo que registraste ya está guardado.</p>
+    ${a0().paused ? `<button class="big pri" data-a="wkResume">Reanudar</button>` : `<button class="big" data-a="wkPause">Pausar</button>`}
     <button class="big" data-a="wkExit">Salir y seguir más tarde</button>
     <button class="big ghost danger" data-a="wkDiscard">Descartar entrenamiento</button>
     <button class="big ghost" data-a="closeModal">Cancelar</button>`),
   wkExit: () => { closeModal(); go('home'); },
+  wkPause: () => { const a = S.active; closeModal(); if (a.paused) return; a.paused = Date.now(); a.restLeft = a.restEnd ? Math.max(0, a.restEnd - Date.now()) : 0; a.restEnd = 0; $('#rest').innerHTML = ''; wkRender(); },
+  wkResume: () => { const a = S.active; closeModal(); if (!a.paused) return; a.start += Date.now() - a.paused; a.paused = 0; if (a.restLeft > 1000) a.restEnd = Date.now() + a.restLeft; a.restLeft = 0; wkRender(); toast('¡Seguimos!'); },
   wkDiscard: () => ask('Descartar entrenamiento', 'Se borran todas las series de esta sesión. No se puede deshacer.', 'Descartar', () => { S.active = null; save(); go('home'); }, true),
   finish: () => {
     const a = S.active;
