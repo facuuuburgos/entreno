@@ -462,7 +462,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.3';
+const KEY = 'entreno.v1', VERSION = '6.4';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1215,6 +1215,13 @@ function vHome() {
   else if (sti.n < (S.lastStreak || 0)) { if (sti.n <= trainedDays(weekStart()).size) S.lostStreak = S.lastStreak; S.lastStreak = sti.n; save(false); }
   if (S.lostStreak) h += `<div class="card row lost"><div style="font-size:30px">💔</div><div class="sp"><div class="t">Perdiste tu racha de ${S.lostStreak} ${dias(S.lostStreak)}</div>
     <div class="mu sm">La semana pasada no llegaste a tu objetivo. Cada día que entrenes vuelve a sumar 🔥</div></div><button class="ghost" data-a="dismissLost" aria-label="Cerrar">✕</button></div>`;
+  const lbk = S.settings.lastBackup || 0;
+  if (S.sessions.length && !S.active && Date.now() - lbk > WEEK && Date.now() > (S.backupSnooze || 0)) {
+    const ago = lbk ? Math.floor((Date.now() - lbk) / 864e5) : 0;
+    h += `<div class="card"><div class="row" style="align-items:flex-start"><div style="font-size:28px">🛟</div><div class="sp"><div class="t">Guardá tu copia de seguridad</div>
+      <div class="mu sm">${lbk ? `La última fue hace ${ago} días.` : 'Todavía no guardaste ninguna.'} Un toque y queda en Archivos o iCloud Drive, por si algún día perdés el teléfono.</div></div></div>
+      <div class="row" style="gap:8px;margin-top:12px"><button class="pri sp" data-a="export">Guardar copia</button><button class="ghost" data-a="snoozeBackup">Más tarde</button></div></div>`;
+  }
   const chips = r => `<div class="mchips">${routineMuscles(r).map(m => `<span class="mchip">${esc(m)}</span>`).join('')}</div>`;
   const other = `<button class="big" style="margin-top:8px;background:rgba(255,255,255,.07)" data-a="chooseRoutine">Elegir otra rutina</button>`;
   if (S.active) {
@@ -2104,7 +2111,7 @@ function vSettings() {
     <label class="f" style="margin-bottom:0"><span>Descanso por defecto para ejercicios nuevos</span><select data-f="drest">${RESTS.map(v => `<option value="${v}" ${v == S.settings.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>
   </div>
   <h2>Respaldo</h2><div class="card">
-    <p class="mu sm" style="margin-top:0">Tus datos se guardan en este dispositivo. Exportá un respaldo cada tanto y guardalo en iCloud Drive o Archivos.</p>
+    <p class="mu sm" style="margin-top:0">Tus datos se guardan en este dispositivo y, si iniciaste sesión, también en tu cuenta. Además, cada semana la app te recuerda guardar una copia en Archivos o iCloud Drive.</p>
     <div class="row sm"><span class="sp mu">Último respaldo</span><span>${lb ? cap(fmtDate(lb)) : '<span class="danger">Nunca</span>'}</span></div>
     <button class="big pri" data-a="export">Exportar respaldo</button>
     <button class="big" data-a="import">Restaurar desde respaldo</button>
@@ -2367,6 +2374,7 @@ const A = {
       <button class="big" data-a="startFree">Sesión libre</button>`);
   },
   openCoach: () => go('coach'),
+  snoozeBackup: () => { S.backupSnooze = Date.now() + 3 * 864e5; save(false); render(); toast('Te lo recuerdo en unos días'); },
   coachF: d => { coachF = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   weekMode: () => {
     const m = S.settings.weekMode === 'cal' ? 'cal' : 'train', o = (k, t, d) => `<button class="opt ${m === k ? 'on' : ''}" data-a="setWeekMode" data-k="${k}"><b>${t}</b><span class="mu sm">${d}</span></button>`;
