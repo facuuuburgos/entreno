@@ -436,6 +436,12 @@ button.tile{color:inherit;font:inherit}
 .wrow2:last-of-type{border-bottom:none}
 .wrow2.on b,.wrow2.on span{color:var(--ac)}
 .bigstat.up{color:var(--ac)}.bigstat.down{color:var(--dn)}
+.pbar{height:6px;border-radius:9px;background:var(--s2);margin:14px 0 12px;overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:9px;background:var(--ac)}
+.opt{display:block;width:100%;text-align:left;background:var(--s2);border:1.5px solid transparent;border-radius:16px;padding:14px 16px;margin:10px 0;color:var(--tx)}
+.opt b{display:block;margin-bottom:4px;font-size:15px}
+.opt.on{border-color:var(--ac);background:var(--acd)}
+.tile b.up{color:var(--ac)}
 </style>
 </head>
 <body>
@@ -456,7 +462,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.1';
+const KEY = 'entreno.v1', VERSION = '6.2';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -609,10 +615,22 @@ function progCtx(p = activeProg()) {
   if (!p || !p.phases.length) return null;
   let idx = p.phases.findIndex(x => p.cur && x.id === p.cur.pid);
   if (idx < 0) { idx = 0; p.cur = { pid: p.phases[0].id, ws: weekStart() }; }
-  const ph = p.phases[idx], w = Math.max(1, Math.round((weekStart() - p.cur.ws) / WEEK) + 1);
-  return { prog: p, ph, idx, w, wEff: Math.min(w, ph.weeks), done: w > ph.weeks, next: p.phases[idx + 1] || null };
+  const ph = p.phases[idx], now = weekStart(), cal = S.settings.weekMode === 'cal', need = weekNeed(ph);
+  let w, skipped = 0;
+  if (cal) w = Math.max(1, Math.round((now - p.cur.ws) / WEEK) + 1);
+  else { let n = 0; for (let t = p.cur.ws; t < now; t = addDays(t, 7)) { if (weekCount(t) >= need) n++; else skipped++; } w = n + 1; }
+  return { prog: p, ph, idx, w, wEff: Math.min(w, ph.weeks), done: w > ph.weeks, next: p.phases[idx + 1] || null, cal, need, skipped, thisWk: weekCount(now) };
 }
 // Ajuste de cada semana: regla automática (+% por semana) que se puede pisar a mano
+// Para que una semana cuente hay que hacer al menos la mitad de los días de la fase
+const weekNeed = ph => Math.max(1, Math.ceil((ph.days.length || 2) / 2));
+function weekStatus(c) {
+  if (!c) return '';
+  if (c.done) return 'Fase completada';
+  if (c.cal) return `Avanza por calendario · termina el ${fmtShort(addDays(weekStart(), (c.ph.weeks - c.w + 1) * 7 - 1))}`;
+  const left = Math.max(0, c.need - c.thisWk);
+  return left ? `Esta semana: ${c.thisWk} de ${c.need} entrenamientos para que cuente` : '✓ Esta semana ya cuenta';
+}
 function weekParams(ph, w) {
   const o = (ph.wk || {})[w] || {}, deload = !!ph.deload && w === ph.weeks && ph.weeks > 1;
   const auto = deload ? -12 : (w - 1) * (+ph.step || 0);
@@ -654,7 +672,7 @@ function coach(exId, rx, before = Infinity) {
     return { w, kind: 'pct', short: `${fmtNum(rx.pct)}% de tu máximo estimado (${Math.round(e1)} ${u})`,
       msg: `Tu fase pide ${fmtNum(rx.pct)}% de tu máximo. Hoy tu máximo estimado es ${Math.round(e1)} ${u}, así que usá ${fmtNum(w)} ${u}. A medida que hagas más repeticiones, el máximo sube y el peso también.` };
   }
-  if (!last) return { w: null, kind: 'new', short: `Elegí un peso con el que llegues a ${repMin}–${repMax} dejando ${target} en reserva`,
+  if (!last) return { w: null, kind: 'new', short: `Sin datos aún: probá un peso para ${repMin}–${repMax} reps`,
     msg: `Es la primera vez. Probá un peso con el que llegues a ${repMin}–${repMax} repeticiones sintiendo que te quedaban unas ${target}. Con esa serie la app aprende tu máximo y desde la próxima te dice qué peso usar.` };
   const sets = last.sets, lw = Math.max(0, ...sets.map(x => x.w));
   const allTop = sets.length >= (rx.sets || 1) && sets.every(x => x.r >= repMax);
@@ -674,6 +692,49 @@ function rxFor(exId) {
   for (const r of planDays()) { const it = r.items.find(x => x.exerciseId === exId); if (it) return Object.assign(prescribe(it, c && r.phaseId === c.ph.id ? c.ph : null, c ? c.wEff : 1), { label: r.name }); }
   for (const r of S.routines) { if (r.archived) continue; const it = r.items.find(x => x.exerciseId === exId); if (it) return Object.assign(prescribe(it, null, 1), { label: r.name }); }
   return null;
+}
+let coachF = 'all';
+function recRow(it, ph, w, rich) {
+  const ex = exById(it.exerciseId) || { name: '(ejercicio)' }, rx = prescribe(it, ph, w), k = coach(it.exerciseId, rx), e1 = curE1(it.exerciseId);
+  return `<div class="exrow" data-a="openEx" data-id="${it.exerciseId}"><div class="sp"><div style="font-weight:600">${esc(ex.name)}</div>
+    <div class="mu sm">${rx.sets} × ${repsTxt(rx.repMin, rx.repMax)}${rx.pct ? ' · ' + fmtNum(rx.pct) + '%' : ''}${rx.rir != null ? ' · RIR ' + rx.rir : ''}${rich && e1 ? ` · máx. ${Math.round(e1)} ${unit()}` : ''}</div>
+    ${rich ? `<div class="sm" style="margin-top:3px;color:var(--tx);opacity:.8">${esc(k.short)}</div>` : ''}</div>
+    <div style="text-align:right;flex-shrink:0"><b style="font-variant-numeric:tabular-nums">${k.w ? fmtNum(k.w) + ' ' + unit() : '—'}</b><div class="cb ${k.kind}">${CB[k.kind]}</div></div></div>`;
+}
+function vCoach() {
+  const c = progCtx(), P = plan(), days = P.act;
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Progreso</div><h1 style="margin-top:6px">Tu entrenador</h1>`;
+  if (c) {
+    const pr = c.done ? 100 : Math.round((c.w - 1) / c.ph.weeks * 100);
+    h += `<div class="card"><div class="row" style="gap:8px;flex-wrap:wrap">${phaseChip(c.ph)}<span class="mu sm">${c.done ? '✓ Completada' : `Semana ${c.w} de ${c.ph.weeks}`}${weekParams(c.ph, c.wEff).deload ? ' · descarga' : ''}</span></div>
+      <div class="pbar"><i style="width:${pr}%"></i></div>
+      <div class="sm">${weekStatus(c)}</div>
+      ${!c.cal && !c.done ? `<div class="mu sm" style="margin-top:4px">${c.ph.weeks - c.w > 0 ? `Si entrenás todas las semanas, la fase termina el ${fmtShort(addDays(weekStart(), (c.ph.weeks - c.w + 1) * 7 - 1))}.` : 'Es la última semana de la fase.'}${c.skipped ? ` ${c.skipped === 1 ? 'Hubo 1 semana que no contó' : `Hubo ${c.skipped} semanas que no contaron`} por entrenar poco: la fase te esperó.` : ''}</div>` : ''}
+      <button class="link" style="margin-top:10px" data-a="weekMode">Cómo avanzan las semanas ›</button></div>`;
+    if (c.done) h += phaseDoneCard(c);
+  }
+  if (!days.length) return h + `<div class="card mu">Cuando tengas días en tu plan, acá vas a ver qué peso usar en cada ejercicio.</div>`;
+  const ph = c ? c.ph : null, w = c ? c.wEff : 1, all = days.flatMap(r => r.items.map(it => ({ r, it, k: coach(it.exerciseId, prescribe(it, ph, w)).kind })));
+  const n = kd => all.filter(x => x.k === kd).length;
+  const F = [['all', 'Todos', all.length], ['up', '↑ Subir', n('up')], ['keep', '= Mantener', n('keep') + n('pct')], ['down', '↓ Bajar', n('down')], ['new', 'Primera vez', n('new')]].filter(f => f[0] === 'all' || f[2]);
+  if (!F.some(f => f[0] === coachF)) coachF = 'all';
+  h += `<div class="tiles"><div class="tile"><b class="up">${n('up')}</b><span>Para subir</span></div><div class="tile"><b>${n('keep') + n('pct')}</b><span>Mantener</span></div><div class="tile"><b style="color:${n('down') ? '#ffb347' : ''}">${n('down')}</b><span>Para bajar</span></div></div>`;
+  h += `<div class="chips" style="margin:18px 0 4px">${F.map(f => `<button class="chip ${coachF === f[0] ? 'on' : ''}" data-a="coachF" data-k="${f[0]}">${f[1]} · ${f[2]}</button>`).join('')}</div>`;
+  const match = k => coachF === 'all' || k === coachF || (coachF === 'keep' && k === 'pct');
+  days.forEach(r => {
+    const rows = r.items.filter(it => match(all.find(x => x.it === it).k));
+    if (!rows.length) return;
+    const nx = P.next && P.next.id === r.id, dn = P.done.has(r.id);
+    h += `<div class="row" style="margin:26px 0 10px"><h2 class="sp" style="margin:0">${esc(r.name)}</h2>${nx ? '<span class="badge ac">Siguiente</span>' : dn ? '<span class="badge">✓ Esta semana</span>' : ''}</div>
+      <div class="card" style="padding:4px 18px">${rows.map(it => recRow(it, ph, w, true)).join('')}</div>`;
+  });
+  h += `<h2>Cómo decide</h2><div class="card sm" style="line-height:1.55">
+    <p style="margin-top:0"><b class="up">↑ Subir</b> cuando llegaste al máximo de repeticiones en todas las series, o te sobraban muchas.</p>
+    <p><b>= Mantener</b> cuando estás dentro del rango: mismo peso y buscá una repetición más.</p>
+    <p><b style="color:#ffb347">↓ Bajar</b> cuando en la mayoría de las series no llegaste al mínimo.</p>
+    <p style="margin-bottom:0"><b style="color:#9b8cff">Según %</b> cuando la fase pide un porcentaje: se calcula con tu máximo estimado, que se actualiza en cada entrenamiento.</p></div>
+    <p class="mu sm c">Tocá un ejercicio para ver su evolución y la tabla de pesos.</p>`;
+  return h;
 }
 function dayRecsHtml(r) {
   const c = progCtx(), f = r.phaseId ? findPhase(r.phaseId) : null, ph = f ? f.ph : null, w = c && ph && c.ph.id === ph.id ? c.wEff : 1;
@@ -999,7 +1060,7 @@ function navScroll() {
 window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
-  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -1014,7 +1075,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -1248,7 +1309,7 @@ function vTrain() {
     h += `<div class="card prog clickable" data-a="openProgram" data-id="${prog.id}">
       <div class="row"><div class="sp"><div class="kicker">Programa activo</div><div class="t" style="font-size:22px;margin-top:2px">${esc(prog.name)}</div></div><span class="mu">›</span></div>
       <div class="row" style="margin:12px 0 2px;gap:8px;flex-wrap:wrap">${phaseChip(ph)}<span class="mu sm">${done ? '✓ Fase completada' : `Semana ${w} de ${ph.weeks}`}${weekParams(ph, c.wEff).deload ? ' · descarga' : ''}</span></div>
-      ${timeline(prog)}</div>`;
+      ${timeline(prog)}${done ? '' : `<div class="mu sm" style="margin-top:10px">${weekStatus(c)}</div>`}</div>`;
     if (done) h += phaseDoneCard(c);
     h += `<div class="row" style="margin:28px 0 12px"><h2 class="sp" style="margin:0">Días · ${esc(ph.name)}</h2><button class="link" data-a="bulkEdit" data-id="${ph.id}" style="margin-right:14px">Cambiar todos</button><button class="link" data-a="openPhase" data-id="${ph.id}">Editar fase</button></div>`;
     if (!P.act.length) h += `<div class="card c"><p class="mu sm" style="margin-top:0">Esta fase todavía no tiene días.</p><button class="big pri" data-a="newDay" data-id="${ph.id}">+ Agregar día</button></div>`;
@@ -1292,6 +1353,8 @@ function vProgram() {
     <div class="card">${timeline(p, true)}</div>`;
   if (!p.active) h += `<button class="big pri" data-a="activateProg" data-id="${p.id}">Usar este programa</button>`;
   if (c && c.done) h += phaseDoneCard(c);
+  h += `<div class="card clickable" data-a="weekMode"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Cómo avanzan las semanas</div>
+    <div class="mu sm">${S.settings.weekMode === 'cal' ? 'Por calendario: pasa una semana cada lunes' : 'Solo cuentan las semanas que entrenás'}</div></div><span class="mu">›</span></div></div>`;
   h += `<h2>Fases</h2>`;
   if (!p.phases.length) h += `<div class="card mu">Todavía no tiene fases.</div>`;
   p.phases.forEach((ph, i) => {
@@ -1411,11 +1474,11 @@ function vProgress() {
   [...S.sessions].reverse().forEach(s => s.exercises.forEach(e => { if (!seen.has(e.exerciseId)) seen.set(e.exerciseId, e.name); }));
   const ch = []; seen.forEach((n, id) => { const a = curE1(id), b = curE1(id, Date.now() - 28 * 864e5); if (a && b) ch.push((a - b) / b * 100); });
   const nx = plan().next;
-  if (ch.length || nx) h += `<h2>Tu entrenador</h2>`;
+  if (ch.length || nx) h += `<div class="row" style="margin:28px 0 12px"><h2 class="sp" style="margin:0">Tu entrenador</h2><button class="link" data-a="openCoach">Ver todo ›</button></div>`;
   if (ch.length) { const avg = Math.round(ch.reduce((a, b) => a + b, 0) / ch.length * 10) / 10;
     h += `<div class="card"><div class="mu sm">Fuerza en las últimas 4 semanas</div><div class="row" style="align-items:baseline;gap:10px;margin-top:4px">
       <div class="bigstat ${avg >= 0 ? 'up' : 'down'}" style="font-size:40px">${avg > 0 ? '+' : ''}${fmtNum(avg)}%</div><span class="mu sm">promedio en ${ch.length} ${ch.length === 1 ? 'ejercicio' : 'ejercicios'}</span></div></div>`; }
-  if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px"><div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div><span class="mu sm">Pesos sugeridos</span></div>${dayRecsHtml(nx)}</div>`;
+  if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px"><div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div><span class="mu sm">Pesos sugeridos</span></div>${dayRecsHtml(nx)}<button class="big" style="margin:8px 0 14px" data-a="openCoach">Ver pesos de todos los días</button></div>`;
   h += `<h2>Tu máximo estimado por ejercicio</h2><div class="card" style="padding:4px 18px">`;
   seen.forEach((name, id) => {
     const ser = exSeries(id); if (!ser.length) return;
@@ -2218,7 +2281,7 @@ const A = {
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'coach') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -2301,6 +2364,17 @@ const A = {
       }).join('')}
       <button class="big" data-a="startFree">Sesión libre</button>`);
   },
+  openCoach: () => go('coach'),
+  coachF: d => { coachF = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
+  weekMode: () => {
+    const m = S.settings.weekMode === 'cal' ? 'cal' : 'train', o = (k, t, d) => `<button class="opt ${m === k ? 'on' : ''}" data-a="setWeekMode" data-k="${k}"><b>${t}</b><span class="mu sm">${d}</span></button>`;
+    openModal(`<div class="t" style="font-size:19px">Cómo avanzan las semanas</div>
+      <p class="mu sm">Es lo que define cuándo sube la carga y cuándo termina cada fase.</p>
+      ${o('train', 'Solo las semanas que entrenás (recomendado)', 'Una semana cuenta si hiciste al menos la mitad de los días de la fase. Si no entrenás, la fase te espera y no subís de carga sin haber entrenado.')}
+      ${o('cal', 'Por calendario', 'Pasa una semana cada lunes, entrenes o no. La fase termina en una fecha fija.')}
+      <button class="big ghost" data-a="closeModal">Cerrar</button>`);
+  },
+  setWeekMode: d => { S.settings.weekMode = d.k; S.updatedAt = Date.now(); closeModal(); save(); render(); toast(d.k === 'cal' ? 'Las semanas avanzan por calendario' : 'Solo cuentan las semanas que entrenás'); },
   dayWeights: d => {
     const r = S.routines.find(x => x.id === d.id); if (!r) return;
     openModal(`<div class="row"><div class="sp"><div class="kicker" style="font-size:11px">Pesos sugeridos</div><div class="t" style="font-size:19px">${esc(r.name)}</div></div><button class="ghost" data-a="closeModal">Cerrar</button></div>
