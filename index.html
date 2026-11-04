@@ -484,13 +484,19 @@ details.tech li{margin:4px 0}
 .exph{position:relative;aspect-ratio:3/2;border-radius:20px;overflow:hidden;background:var(--s1);margin:0 0 14px}
 .exph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.92)}
 .exph:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,13,0) 55%,rgba(11,11,13,.75));pointer-events:none}
-.exph .b{animation:xf 3.6s ease-in-out infinite alternate}
+.exph .b{animation:xf 2.2s ease-in-out infinite alternate}
 .exph .exl{position:absolute;left:12px;bottom:10px;z-index:1;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff}
 .exph .exl i{font-style:normal;position:absolute;left:0;bottom:0;white-space:nowrap;padding:5px 10px;border-radius:99px;background:rgba(0,0,0,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.exph .exl i:first-child{animation:xf 3.6s ease-in-out infinite alternate-reverse}
+.exph .exl i:first-child{animation:xf 2.2s ease-in-out infinite alternate-reverse}
 @keyframes xf{0%,38%{opacity:0}62%,100%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.exph .b{animation:none;opacity:0}.exph .exl i:first-child{animation:none}}
 .sheet .exph{margin-top:4px}
+.pvh{display:flex;gap:5px;height:110px;align-items:flex-end;margin-top:16px;padding-top:14px;border-top:1.5px dashed rgba(255,255,255,.14)}
+.pvh div{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;position:relative}
+.pvh i{display:block;width:100%;border-radius:6px 6px 3px 3px;background:#ff7ab6;min-height:3px}
+.pvh .ok i{background:var(--ac)}.pvh .part i{background:#ffb347}.pvh .cur i{background:#7fd3ff}.pvh .zero i{background:var(--s3)}
+.pvh b{position:absolute;top:-16px;font-size:10px;color:var(--mu);font-weight:600}
+.pvh span{font-size:9px;color:var(--mu2);margin-top:5px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -511,7 +517,7 @@ details.tech li{margin:4px 0}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '7.0';
+const KEY = 'entreno.v1', VERSION = '7.1';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -769,7 +775,7 @@ function coach(exId, rx, before = Infinity) {
   const st = stallInfo(exId, before);
   if (lw > 0 && st) { const w = roundTo(lw * 0.9, step);
     return { w, kind: 'stall', short: `${st.n} sesiones sin mejorar: bajá a ${fmtNum(w)} y volvé a subir`,
-      msg: `Hace ${st.n} sesiones que no superás tu mejor marca (máximo estimado ${Math.round(st.best)} ${u}). Es normal y tiene arreglo: bajá a ${fmtNum(w)} ${u} (10% menos) y volvé a subir de a poco sumando repeticiones. En 2 o 3 semanas solés pasar la marca anterior. Si sigue igual, probá cambiar el rango de repeticiones o reemplazarlo un tiempo por una variante.` }; }
+      msg: `Hace ${st.n} sesiones que no superás tu mejor marca (máximo estimado ${Math.round(st.best)} ${u}). Es normal y tiene arreglo: bajá a ${fmtNum(w)} ${u} (10% menos) y volvé a subir de a poco sumando repeticiones. En 2 o 3 semanas solés pasar la marca anterior. Si sigue igual, probá cambiar el rango de repeticiones o reemplazarlo un tiempo por una variante.${cutting() ? ' Ojo: venís bajando de peso, y en esa situación frenarse un poco es normal; si querés, podés mantener el peso en vez de bajarlo.' : ''}` }; }
   return { w: lw || null, kind: 'keep', short: 'Mismo peso: buscá una repetición más que la última vez',
     msg: `La última vez hiciste ${seen}. Mantené ${lw ? fmtNum(lw) + ' ' + u : 'el mismo peso'} y tratá de sumar una repetición por serie. Cuando llegues a ${repMax} en todas, la app te va a decir que subas.` };
 }
@@ -1321,6 +1327,70 @@ function vMuscle() {
       return `<div class="exrow"><div class="sp"><div style="font-weight:600">${esc(x.name)}</div><div class="mu sm">${sec.length ? 'También trabaja: ' + sec.join(', ') : 'Trabajo directo'}</div></div><button class="sm" data-a="addToDay" data-id="${x.id}">+ Agregar</button></div>`; }).join('')}</div>`;
   return h;
 }
+/* ---------- Cuerpo ---------- */
+let bodyM = 'weight';
+const BODYF = { weight: ['Peso', 'kg'], fat: ['% grasa', '%'], muscle: ['Masa muscular', 'kg'], lean: ['Masa magra', 'kg'] };
+// Cambio de peso en las últimas ~5 semanas (null si no hay datos suficientes)
+function bodyDelta(days = 35) {
+  const B = S.body; if (B.length < 2) return null; const L = B[B.length - 1]; if (Date.now() - L.date > 21 * 864e5) return null;
+  const ref = [...B].reverse().find(x => L.date - x.date >= days * 864e5 * .6); if (!ref || L.date - ref.date > days * 864e5 * 2) return null;
+  return r2(L.weight - ref.weight);
+}
+const cutting = () => { const d = bodyDelta(); return d !== null && d <= -1; };
+function bodyInsights() {
+  const B = S.body.filter(x => x.weight); if (B.length < 2) return [];
+  const a = B[0], z = B[B.length - 1], t = [], mo = Math.max(1, Math.round((z.date - a.date) / (30.4 * 864e5)));
+  const dw = r2(z.weight - a.weight), fa = B.find(x => x.fatKg != null), fz = [...B].reverse().find(x => x.fatKg != null), ma = B.find(x => x.muscle != null), mz = [...B].reverse().find(x => x.muscle != null);
+  const df = fa && fz && fa !== fz ? r2(fz.fatKg - fa.fatKg) : null, dm = ma && mz && ma !== mz ? r2(mz.muscle - ma.muscle) : null;
+  const sg = v => (v > 0 ? '+' : '') + fmtNum(v).replace('.', ',');
+  t.push(`En ${mo} ${mo === 1 ? 'mes' : 'meses'}: <b>${sg(dw)} kg</b> de peso${df !== null ? `, <b>${sg(df)} kg</b> de grasa` : ''}${dm !== null ? ` y <b>${sg(dm)} kg</b> de masa muscular` : ''}.`);
+  if (df !== null && dm !== null) {
+    if (dm >= 1 && df <= .5) t.push('Ganaste músculo sin sumar grasa: es justo lo que buscás.');
+    else if (dm >= 1) t.push('Ganaste músculo, y algo de grasa en el camino: es normal cuando se sube de peso.');
+    else if (df >= 1 && dm < 1) t.push('Lo que subiste fue sobre todo grasa y el músculo quedó parecido. Para ganar músculo suele funcionar subir de a poco (unos 0,25–0,5 kg por mes), comer suficiente proteína y entrenar con progresión constante.');
+    else if (df <= -1 && dm > -1) t.push('Bajaste grasa manteniendo el músculo: muy bien.');
+    else t.push('Tu composición está bastante estable.');
+  }
+  const d = bodyDelta(); if (d !== null && Math.abs(d) >= 1) t.push(d < 0 ? `En el último mes bajaste ${fmtNum(-d)} kg: con menos comida es normal que la fuerza suba más lento. La app lo tiene en cuenta cuando te frenás.` : `En el último mes subiste ${fmtNum(d)} kg: es buen momento para progresar en fuerza.`);
+  t.push('<span class="mu">La bioimpedancia puede variar 1–2 kg según cuánto tomaste o comiste: mirá la tendencia de varios meses, no una medición sola.</span>');
+  return t;
+}
+function vBody() {
+  const B = S.body, L = B[B.length - 1];
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button><span class="sp"></span><button class="sm pri" data-a="addBody">+ Medición</button></div>
+    <div class="kicker">Progreso</div><h1 style="margin-top:6px">Cuerpo</h1>`;
+  if (!L) return h + `<div class="card c"><p class="mu" style="margin-top:0">Registrá tu peso o tu bioimpedancia cada tanto. La app los usa para interpretar tu progreso y tus estancamientos.</p><button class="big pri" data-a="addBody">Registrar medición</button></div>`;
+  const hm = num(S.profile.height) / 100;
+  h += `<div class="card"><div class="mu sm">Última medición · ${fmtShort(L.date)}${L.src === 'bio' ? ' · bioimpedancia' : ''}</div>
+    <div class="bigstat" style="margin-top:4px"><span class="grad">${fmtNum(L.weight).replace('.', ',')}</span><span class="mu" style="font-size:20px;font-weight:600"> kg</span></div>
+    <div class="tiles" style="margin-top:12px"><div class="tile"><b>${L.fat != null ? fmtNum(L.fat).replace('.', ',') + '%' : '—'}</b><span>Grasa</span></div><div class="tile"><b>${L.muscle != null ? fmtNum(L.muscle).replace('.', ',') : '—'}</b><span>Músculo (kg)</span></div>
+    <div class="tile"><b>${L.visceral != null ? L.visceral : hm > 0 ? (L.weight / hm / hm).toFixed(1).replace('.', ',') : '—'}</b><span>${L.visceral != null ? 'Grasa visceral' : 'IMC'}</span></div></div></div>`;
+  const pts = B.filter(x => x[bodyM] != null).map(x => ({ x: x.date, y: x[bodyM] }));
+  h += `<div class="seg" style="margin:18px 0 10px">${Object.keys(BODYF).map(k => `<button class="${bodyM === k ? 'on' : ''}" data-a="bodyM" data-k="${k}">${BODYF[k][0]}</button>`).join('')}</div>
+    <div class="card">${pts.length > 1 ? lineChart(pts, BODYF[bodyM][1]) : `<p class="mu sm" style="margin:0">Hace falta más de una medición con este dato.</p>`}</div>`;
+  const I = bodyInsights(); if (I.length) h += `<h2>Qué muestran tus datos</h2><div class="card sm" style="line-height:1.55">${I.map(x => `<p style="margin:6px 0">${x}</p>`).join('')}</div>`;
+  const top = [...new Set(S.sessions.flatMap(s => s.exercises.map(e => e.exerciseId)))].filter(id => ['Pecho', 'Espalda', 'Cuádriceps', 'Femoral', 'Glúteo', 'Deltoide anterior'].includes(mainMus(id))).map(id => ({ id, e1: curE1(id) })).filter(x => x.e1).sort((a, b) => b.e1 - a.e1).slice(0, 5);
+  if (top.length) h += `<h2>Fuerza relativa</h2><div class="card" style="padding:4px 18px">${top.map(x => `<div class="exrow" data-a="openEx" data-id="${x.id}"><div class="sp" style="font-weight:600">${esc((exById(x.id) || {}).name || '')}</div>
+      <div style="text-align:right"><b>${(x.e1 / L.weight).toFixed(2).replace('.', ',')}×</b><div class="mu sm">${Math.round(x.e1)} kg máx. est.</div></div></div>`).join('')}</div>
+    <p class="mu sm">Tu máximo estimado dividido tu peso corporal. Es la forma justa de comparar tu fuerza en el tiempo si tu peso cambia.</p>`;
+  h += `<h2>Historial</h2><div class="card" style="padding:4px 18px">${[...B].reverse().map(x => `<div class="exrow" data-a="bodyMenu" data-id="${x.id}"><div class="sp"><div style="font-weight:600">${fmtNum(x.weight).replace('.', ',')} kg</div>
+    <div class="mu sm">${cap(fmtDate(x.date))}${x.fat != null ? ' · ' + fmtNum(x.fat).replace('.', ',') + '% grasa' : ''}${x.muscle != null ? ' · músculo ' + fmtNum(x.muscle).replace('.', ',') : ''}${x.waist ? ' · cintura ' + fmtNum(x.waist) : ''}</div></div><span class="mu">›</span></div>`).join('')}</div>`;
+  return h;
+}
+// Tu bioimpedancia de SmartFit (se carga una sola vez en tu cuenta)
+function seedBio() {
+  if (S.bioSeed || !AUTH || !AUTH.user) return;
+  let hh = 5381; for (const c of String(AUTH.user.email || '')) hh = ((hh << 5) + hh + c.charCodeAt(0)) >>> 0;
+  if (hh !== 4000557220) return;
+  const R = [['2025-12-10', 60, 49, 7, 31], ['2026-01-03', 63, 49, 10, 30], ['2026-02-03', 62, 52, 6, 32], ['2026-04-20', 60, 50, 6, 30], ['2026-07-07', 62, 50, 8, 31], ['2026-09-04', 62.8, 49.4, 9.6, 30]];
+  R.forEach(([d, w, lean, fk, mus]) => { const id = 'bio-' + d; if (S.body.some(b => b.id === id)) return; const [y, m, dd] = d.split('-').map(Number);
+    const x = { id, date: new Date(y, m - 1, dd, 12).getTime(), weight: w, lean, fatKg: fk, fat: Math.round(fk / w * 1000) / 10, muscle: mus, src: 'bio', u: Date.now() };
+    if (d === '2026-09-04') Object.assign(x, { fat: 15.3, visceral: 4, water: 36.2, bmr: 1614 });
+    S.body.push(x); });
+  S.body.sort((a, b) => a.date - b.date);
+  if (!S.profile.height) S.profile.height = 168;
+  S.bioSeed = true; save();
+}
 /* ---------- Navegación ---------- */
 let R = { view: S.active ? 'workout' : (cloudOn() && !AUTH && !S.skipWelcome ? 'welcome' : 'home'), id: null, from: 'home' };
 let draft = null, editHist = false, peek = false, metric = 'ent', fresh = null;
@@ -1407,7 +1477,8 @@ function navScroll() {
 window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
-  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, muscles: vMuscles, muscle: vMuscle, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  try { seedBio(); } catch (e) {}
+  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -1422,7 +1493,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', muscles: 'progress', muscle: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -1840,6 +1911,9 @@ function vProgress() {
     h += `<h2>Músculos</h2><div class="card clickable" data-a="openMuscles"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Series por músculo y comparaciones</div>
       <div class="mu sm">Esta semana: ${ok} de ${main.length} músculos en rango · ver qué suma a cada uno</div></div><span class="mu">›</span></div>
       ${main.length ? `<div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div>` : ''}</div>`; }
+  { const L = S.body[S.body.length - 1], d = bodyDelta();
+    h += `<div class="card clickable" data-a="openBody"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Cuerpo</div>
+      <div class="mu sm">${L ? `${fmtNum(L.weight).replace('.', ',')} kg${L.fat != null ? ' · ' + fmtNum(L.fat).replace('.', ',') + '% grasa' : ''}${d !== null && d ? ` · ${d > 0 ? '+' : ''}${fmtNum(d).replace('.', ',')} kg en el mes` : ''}` : 'Peso, bioimpedancia y fuerza relativa'}</div></div><span class="mu">›</span></div></div>`; }
   h += `<h2>Tu máximo estimado por ejercicio</h2><div class="card" style="padding:4px 18px">`;
   seen.forEach((name, id) => {
     const ser = exSeries(id); if (!ser.length) return;
@@ -2158,6 +2232,19 @@ function vConsistency() {
     <div class="dbars">${byDay.map((v, i) => `<div class="db ${i === favD ? 'top' : ''}"><i style="height:${maxD ? Math.max(6, v / maxD * 100) : 6}%"></i><span>${'LMXJVSD'[i]}</span></div>`).join('')}</div>
     <p class="mu sm c" style="margin:6px 0 0">Promedio por semana de las últimas 8 semanas</p></div>
     <h2>Último año</h2><div class="card"><div class="hmwrap" id="hmy">${heatmap(53)}</div></div>`;
+  // Planeado contra hecho
+  const W0 = Math.max(weekStart(S.sessions[0].start), addDays(weekStart(), -7 * 11)), wk = []; for (let t = W0; t <= weekStart(); t = addDays(t, 7)) wk.push(t);
+  const done = wk.map(cnt), past = wk.slice(0, -1), pd = done.slice(0, -1);
+  const plan = past.length * goal, got = pd.reduce((a, v) => a + Math.min(v, goal), 0), adh = plan ? Math.round(got / plan * 100) : null, miss = plan - got;
+  h += `<h2>Planeado contra hecho</h2><div class="card">${adh !== null ? `<div class="row" style="align-items:baseline;gap:10px"><div class="bigstat ${adh >= 80 ? 'up' : ''}" style="font-size:40px">${adh}%</div><span class="mu sm">de los entrenos planeados en ${past.length} ${past.length === 1 ? 'semana' : 'semanas'}</span></div>` : ''}
+    <div class="pvh">${wk.map((t, i) => { const v = done[i], cur = i === wk.length - 1; return `<div class="${cur ? 'cur' : v >= goal ? 'ok' : v ? 'part' : 'zero'}"><i style="height:${Math.min(100, v / goal * 100)}%"></i><b>${v}</b><span>${new Date(t).getDate()}/${new Date(t).getMonth() + 1}</span></div>`; }).join('')}</div>
+    <p class="mu sm" style="margin:8px 0 0">Tu objetivo: ${goal} por semana (la línea de arriba).${miss > 0 ? ` En este tiempo quedaron ${miss} ${miss === 1 ? 'entreno' : 'entrenos'} sin hacer.` : ' ¡No te faltó ninguno!'}${done[done.length - 1] < goal ? ` Esta semana te ${goal - done[done.length - 1] === 1 ? 'falta 1' : `faltan ${goal - done[done.length - 1]}`}.` : ''}</p></div>`;
+  const pdays = planDays();
+  if (pdays.length > 1 && past.length >= 3) {
+    const sk = pdays.map(r => ({ r, n: past.filter(t => !S.sessions.some(s => s.routineId === r.id && s.start >= t && s.start < addDays(t, 7))).length })).sort((a, b) => b.n - a.n);
+    if (sk[0].n) h += `<div class="card"><div class="mu sm">El día que más se te queda afuera</div><div class="t" style="margin-top:4px">${esc(sk[0].r.name)}</div>
+      <div class="mu sm">Faltó ${sk[0].n} de ${past.length} semanas.${sk[0].n >= past.length / 2 ? ' Si suele pasar, probá hacerlo primero en la semana.' : ''}</div></div>`;
+  }
   return h;
 }
 const SHARE_ICO = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5"/><path d="M8 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2"/></svg>';
@@ -2345,20 +2432,9 @@ function vProfile() {
     <div class="row" style="gap:8px"><label class="f sp"><span>Altura (cm)</span><input inputmode="numeric" data-f="prof" data-k="height" value="${esc(P.height)}" placeholder="175"></label>
     <label class="f sp"><span>Año de nacimiento</span><input inputmode="numeric" data-f="prof" data-k="birthYear" value="${esc(P.birthYear)}" placeholder="2000"></label></div>
     <label class="f" style="margin-bottom:0"><span>Objetivo</span><select data-f="prof" data-k="goal">${['', 'Ganar músculo', 'Ganar fuerza', 'Perder grasa', 'Recomposición', 'Mantenerme'].map(g => `<option ${g === P.goal ? 'selected' : ''} value="${g}">${g || 'Elegir…'}</option>`).join('')}</select></label></div>`;
-  // Peso corporal
-  h += `<div class="row" style="margin:32px 0 12px"><h2 class="sp" style="margin:0">Peso corporal</h2><button class="link" data-a="addBody">+ Registrar</button></div>`;
-  if (!B.length) h += `<div class="card c"><p class="mu" style="margin-top:0">Registrá tu peso cada tanto para ver cómo cambia.</p><button class="big pri" data-a="addBody">Registrar mi peso</button></div>`;
-  else {
-    const d = r2(last.weight - first.weight);
-    h += `<div class="card"><div class="mu sm">Actual · ${fmtShort(last.date)}</div><div class="row" style="align-items:baseline;margin-top:4px">
-      <div class="bigstat"><span class="grad">${fmtNum(last.weight)}</span><span class="mu" style="font-size:20px;font-weight:600"> kg</span></div>
-      ${B.length > 1 && d ? `<span style="font-weight:700;color:var(--mu)">${d > 0 ? '+' : ''}${fmtNum(d)} kg desde ${fmtShort(first.date)}</span>` : ''}</div>
-      ${B.length > 1 ? lineChart(B.map(x => ({ x: x.date, y: x.weight })), 'kg') : ''}</div>
-      <div class="tiles">${bmi ? `<div class="tile"><b>${bmi.toFixed(1)}</b><span>IMC</span></div>` : `<div class="tile"><b>—</b><span>IMC (falta altura)</span></div>`}
-      <div class="tile"><b>${last.fat ? fmtNum(last.fat) + '%' : '—'}</b><span>% grasa</span></div><div class="tile"><b>${last.waist ? fmtNum(last.waist) : '—'}</b><span>Cintura (cm)</span></div></div>
-      <div class="card" style="padding:4px 18px;margin-top:10px">${[...B].reverse().slice(0, 12).map(x => `<div class="exrow" data-a="bodyMenu" data-id="${x.id}"><div class="sp"><div style="font-weight:600">${fmtNum(x.weight)} kg</div>
-        <div class="mu sm">${cap(fmtDate(x.date))}${x.fat ? ' · ' + fmtNum(x.fat) + '% grasa' : ''}${x.waist ? ' · cintura ' + fmtNum(x.waist) + ' cm' : ''}</div></div><span class="mu">›</span></div>`).join('')}</div>`;
-  }
+  { const L = S.body[S.body.length - 1];
+    h += `<h2>Cuerpo</h2><div class="card clickable" data-a="openBody"><div class="row"><div class="sp"><div class="t" style="font-size:16px">${L ? fmtNum(L.weight).replace('.', ',') + ' kg' : 'Peso y bioimpedancia'}</div>
+      <div class="mu sm">${L ? 'Última medición: ' + fmtShort(L.date) : 'Registrá tus mediciones'}</div></div><span class="mu">›</span></div></div>`; }
   if (age) h += `<p class="mu sm c" style="margin-top:14px">${age} años${P.goal ? ' · ' + esc(P.goal) : ''}</p>`;
   return h;
 }
@@ -2496,6 +2572,7 @@ function vSettings() {
     <div class="row sm"><span class="sp mu">Último respaldo</span><span>${lb ? cap(fmtDate(lb)) : '<span class="danger">Nunca</span>'}</span></div>
     <button class="big pri" data-a="export">Exportar respaldo</button>
     <button class="big" data-a="import">Restaurar desde respaldo</button>
+    <button class="big" data-a="exportCSV">Exportar a planilla (Excel / Numbers)</button>
   </div>
   <h2>Datos</h2><div class="card sm"><div class="row"><span class="sp mu">Rutinas</span>${S.routines.length}</div><div class="sep"></div>
     <div class="row"><span class="sp mu">Ejercicios</span>${S.exercises.length}</div><div class="sep"></div>
@@ -2652,6 +2729,9 @@ const A = {
       <label class="f sp"><span>Peso (kg)</span><input id="bw" inputmode="decimal" placeholder="${last ? fmtNum(last.weight) : '75'}"></label></div>
       <div class="row" style="gap:8px"><label class="f sp"><span>% grasa (opcional)</span><input id="bf" inputmode="decimal"></label>
       <label class="f sp"><span>Cintura cm (opcional)</span><input id="bc" inputmode="decimal"></label></div>
+      <details class="card tech" style="margin-top:8px;background:var(--s2)"><summary><b>Datos de bioimpedancia</b><span class="mu sm">opcional</span></summary>
+      <div class="row" style="gap:8px"><label class="f sp"><span>Masa muscular (kg)</span><input id="bm" inputmode="decimal"></label><label class="f sp"><span>Masa libre de grasa (kg)</span><input id="bl" inputmode="decimal"></label></div>
+      <div class="row" style="gap:8px"><label class="f sp"><span>Masa de grasa (kg)</span><input id="bk" inputmode="decimal"></label><label class="f sp"><span>Grasa visceral</span><input id="bv" inputmode="numeric"></label></div></details>
       <button class="big pri" data-a="saveBody">Guardar</button><button class="big ghost" data-a="closeModal">Cancelar</button>`);
   },
   saveBody: () => {
@@ -2659,6 +2739,10 @@ const A = {
     const [y, m, dd] = ($('#bd').value || ymd(Date.now())).split('-').map(Number);
     const x = { id: uid(), date: new Date(y, m - 1, dd, 12).getTime(), weight: r2(w) };
     const f = num($('#bf').value), c = num($('#bc').value); if (Number.isFinite(f)) x.fat = r2(f); if (Number.isFinite(c)) x.waist = r2(c);
+    const bm = num($('#bm').value), bl = num($('#bl').value), bk = num($('#bk').value), bv = num($('#bv').value);
+    if (Number.isFinite(bm)) x.muscle = r2(bm); if (Number.isFinite(bl)) x.lean = r2(bl); if (Number.isFinite(bv)) x.visceral = bv;
+    if (Number.isFinite(bk)) { x.fatKg = r2(bk); if (x.fat == null) x.fat = Math.round(bk / w * 1000) / 10; } else if (x.fat != null) x.fatKg = r2(w * x.fat / 100);
+    if (Number.isFinite(bm) || Number.isFinite(bl) || Number.isFinite(bk)) x.src = 'bio'; x.u = Date.now();
     S.body.push(x); S.body.sort((a, b) => a.date - b.date); closeModal(); save(); render(); toast('Medición guardada');
   },
   bodyMenu: d => {
@@ -2701,7 +2785,7 @@ const A = {
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (R.view === 'coach' || R.view === 'muscles') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (R.view === 'coach' || R.view === 'muscles' || R.view === 'body') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -3192,6 +3276,21 @@ const A = {
 
   // ajustes
   export: () => doExport(),
+  exportCSV: async () => {
+    const q = v => { const t = String(v ?? ''); return /[;"\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; }, nf = v => v === '' || v == null ? '' : String(v).replace('.', ',');
+    const D = ts => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+    const rows = [['Fecha', 'Rutina', 'Fase', 'Ejercicio', 'Músculo', 'Serie', 'Peso (kg)', 'Repeticiones', 'Reps en reserva', 'Máximo estimado (kg)', 'Volumen (kg)']];
+    S.sessions.forEach(s => s.exercises.forEach(e => e.sets.forEach((x, k) => rows.push([D(s.start), s.name || ((S.routines.find(r => r.id === s.routineId) || {}).name) || '', s.phase || '', e.name, mainMus(e.exerciseId), k + 1, nf(x.w), x.r, x.rir ?? '', nf(x.w > 0 ? Math.round(e1rm(x.w, x.r + (x.rir || 0)) * 10) / 10 : ''), nf(r2(x.w * x.r))]))));
+    const body = [['Fecha', 'Peso (kg)', '% grasa', 'Grasa (kg)', 'Masa muscular (kg)', 'Masa libre de grasa (kg)', 'Grasa visceral', 'Cintura (cm)'], ...S.body.map(b => [D(b.date), nf(b.weight), nf(b.fat), nf(b.fatKg), nf(b.muscle), nf(b.lean), b.visceral ?? '', nf(b.waist)])];
+    const csv = r => '﻿' + r.map(l => l.map(q).join(';')).join('\r\n');
+    const f1 = new File([csv(rows)], 'entreno-series.csv', { type: 'text/csv' }), f2 = new File([csv(body)], 'entreno-cuerpo.csv', { type: 'text/csv' });
+    const files = S.body.length ? [f1, f2] : [f1];
+    try { if (navigator.canShare && navigator.canShare({ files })) { await navigator.share({ files }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+    files.forEach(f => { const u = URL.createObjectURL(f), a = document.createElement('a'); a.href = u; a.download = f.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 3000); });
+    toast('Planilla descargada');
+  },
+  openBody: () => { closeModal(); go('body'); },
+  bodyM: d => { bodyM = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   import: () => $('#impf').click(),
   wipe: () => ask('Borrar todos los datos', 'Se eliminan rutinas, ejercicios propios y todo el historial de este dispositivo. Exportá un respaldo antes si querés conservarlos.', 'Borrar todo', () => {
     S = migratePrograms(importSheet(migrate(seed()))); save(); go('home'); toast('Datos borrados');
