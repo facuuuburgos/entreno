@@ -462,7 +462,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.2';
+const KEY = 'entreno.v1', VERSION = '6.3';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -907,8 +907,10 @@ function exSeries(exId) {
   const out = [];
   S.sessions.forEach(s => s.exercises.forEach(e => {
     if (e.exerciseId !== exId || !e.sets.length) return;
-    const best = e.sets.reduce((b, x) => e1rm(x.w, x.r) > e1rm(b.w, b.r) ? x : b, e.sets[0]);
-    out.push({ date: s.start, sid: s.id, sets: e.sets, e1: e1rm(best.w, best.r), best, maxW: Math.max(...e.sets.map(x => x.w)) });
+    // Mismo cálculo que el máximo estimado: cuenta también las repeticiones que te sobraban
+    const est = x => x.w > 0 ? e1rm(x.w, x.r + (x.rir || 0)) : 0;
+    const best = e.sets.reduce((b, x) => est(x) > est(b) ? x : b, e.sets[0]);
+    out.push({ date: s.start, sid: s.id, sets: e.sets, e1: est(best), best, maxW: Math.max(...e.sets.map(x => x.w)) });
   }));
   return out;
 }
