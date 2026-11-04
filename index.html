@@ -485,7 +485,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.6';
+const KEY = 'entreno.v1', VERSION = '6.7';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1048,59 +1048,110 @@ function barChart(vals, labels, hi = -1) {
       <text x="${(x + bw / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle" font-size="9.5" fill="#8a8a94">${esc(labels[i])}</text>`; }).join('')}</svg>`;
 }
 /* ---------- Músculos: series semanales ---------- */
-// Rango aproximado de series semanales para crecer (los músculos chicos reciben trabajo indirecto)
-const MRANGE = m => ['Bíceps', 'Tríceps', 'Gemelos'].includes(m) ? [8, 16] : ['Pecho', 'Espalda', 'Hombro', 'Cuádriceps', 'Femoral', 'Glúteo'].includes(m) ? [10, 20] : null;
-const muscleOf = e => { const x = exById(e.exerciseId); return (x && x.muscle) || e.muscle || 'Otro'; };
+// Músculos que analiza la app, con el rango aproximado de series semanales para ganar músculo
+const AM = [
+  ['Pecho', [10, 20], 'sup'], ['Espalda', [10, 20], 'sup'], ['Deltoide anterior', [6, 12], 'sup'], ['Deltoide lateral', [8, 16], 'sup'], ['Deltoide posterior', [8, 16], 'sup'],
+  ['Bíceps', [8, 16], 'sup'], ['Tríceps', [8, 16], 'sup'], ['Trapecio', null, 'sup'], ['Antebrazo', null, 'sup'],
+  ['Cuádriceps', [10, 20], 'inf'], ['Femoral', [10, 20], 'inf'], ['Glúteo', [10, 20], 'inf'], ['Abductores', [4, 12], 'inf'], ['Aductores', [4, 12], 'inf'], ['Gemelos', [8, 16], 'inf'],
+  ['Abdomen', [6, 12], 'core'], ['Lumbar', null, 'core']];
+const MRANGE = m => { const x = AM.find(a => a[0] === m); return x ? x[1] : null; };
+const MNOTE = { 'Deltoide anterior': 'Ya trabaja bastante en los press de pecho y hombro.', Trapecio: 'Trabaja en remos, peso muerto y face pull. Sin objetivo fijo.', Antebrazo: 'Trabaja al agarrar en remos, dominadas y curls. Sin objetivo fijo.', Lumbar: 'Trabaja en peso muerto, rumano y remos. Sin objetivo fijo.', Abductores: 'Glúteo medio: estabiliza la cadera.', Aductores: 'Cara interna del muslo.' };
+// Qué músculos trabaja cada ejercicio: 1 = principal (la serie cuenta entera), 0,5 = secundario (cuenta la mitad)
+const MMAP = (() => {
+  const pr = { Pecho: 1, 'Deltoide anterior': .5, Tríceps: .5 }, sh = { 'Deltoide anterior': 1, 'Deltoide lateral': .5, Tríceps: .5 }, row = { Espalda: 1, 'Deltoide posterior': .5, Bíceps: .5 }, pull = { Espalda: 1, Bíceps: .5 };
+  const curl = { Bíceps: 1 }, ham = { Bíceps: 1, Antebrazo: .5 }, tri = { Tríceps: 1 }, calf = { Gemelos: 1 }, abs = { Abdomen: 1 }, lunge = { Cuádriceps: 1, Glúteo: 1, Aductores: .5 }, sq = { Cuádriceps: 1, Glúteo: .5, Aductores: .5 };
+  const M = {
+    'Press de banca con barra': pr, 'Press inclinado con barra': pr, 'Press de banca con mancuernas': pr, 'Press inclinado con mancuernas': pr, 'Press en máquina': pr, 'Flexiones': pr,
+    'Aperturas con mancuernas': { Pecho: 1 }, 'Cruces en polea': { Pecho: 1 }, 'Pec deck': { Pecho: 1 }, 'Fondos en paralelas': { Pecho: 1, Tríceps: .5, 'Deltoide anterior': .5 },
+    'Press militar con barra': sh, 'Press de hombro con mancuernas': sh, 'Press de hombro en máquina': sh,
+    'Elevaciones laterales': { 'Deltoide lateral': 1 }, 'Elevaciones laterales en polea': { 'Deltoide lateral': 1 }, 'Elevaciones frontales': { 'Deltoide anterior': 1 },
+    'Pájaros (deltoide posterior)': { 'Deltoide posterior': 1, Trapecio: .5 }, 'Face pull': { 'Deltoide posterior': 1, Trapecio: .5 },
+    'Extensión de tríceps en polea': tri, 'Extensión de tríceps sobre la cabeza': tri, 'Press francés': tri, 'Patada de tríceps': tri, 'Press cerrado': { Tríceps: 1, Pecho: .5, 'Deltoide anterior': .5 },
+    'Dominadas': pull, 'Jalón al pecho': pull, 'Jalón agarre cerrado': pull, 'Pullover en polea': { Espalda: 1 },
+    'Remo con barra': { ...row, Lumbar: .5 }, 'Remo con mancuerna': row, 'Remo en polea baja': row, 'Remo en máquina': row, 'Remo en T': row,
+    'Peso muerto': { Glúteo: 1, Lumbar: 1, Femoral: .5, Cuádriceps: .5, Trapecio: .5, Antebrazo: .5 }, 'Encogimientos': { Trapecio: 1 },
+    'Curl con barra': curl, 'Curl con mancuernas': curl, 'Curl en banco inclinado': curl, 'Curl en polea': curl, 'Curl predicador': curl, 'Curl bayesian en polea': curl,
+    'Curl martillo': ham, 'Curl martillo en banco Scott': ham, 'Curl de muñeca': { Antebrazo: 1 },
+    'Sentadilla con barra': sq, 'Prensa de piernas': sq, 'Sentadilla frontal': { Cuádriceps: 1, Glúteo: .5 }, 'Sentadilla hack': { Cuádriceps: 1, Glúteo: .5 }, 'Sentadilla goblet': { Cuádriceps: 1, Glúteo: .5 },
+    'Extensión de cuádriceps': { Cuádriceps: 1 }, 'Camilla de cuádriceps': { Cuádriceps: 1 }, 'Zancadas': lunge, 'Estocadas en Smith': lunge, 'Sentadilla búlgara': lunge,
+    'Peso muerto rumano': { Femoral: 1, Glúteo: 1, Lumbar: .5 }, 'Buenos días': { Femoral: 1, Lumbar: 1, Glúteo: .5 }, 'Curl femoral acostado': { Femoral: 1 }, 'Curl femoral sentado': { Femoral: 1 },
+    'Hip thrust': { Glúteo: 1, Femoral: .5 }, 'Patada de glúteo en polea': { Glúteo: 1 }, 'Abducción en máquina': { Abductores: 1, Glúteo: .5 }, 'Aducción en máquina': { Aductores: 1 },
+    'Elevación de talones de pie': calf, 'Elevación de talones sentado': calf, 'Gemelos en prensa': calf, 'Elevación de talones unilateral con mancuerna': calf,
+    'Plancha': abs, 'Crunch en polea': abs, 'Elevación de piernas colgado': abs, 'Rueda abdominal': abs };
+  const o = {}; Object.keys(M).forEach(k => o[norm(k)] = M[k]); return o;
+})();
+const MFB = { Hombro: { 'Deltoide anterior': .5, 'Deltoide lateral': .5 } };
+function exMus(exId, name, muscle) {
+  const x = exById(exId), n = norm((x && x.name) || name || '');
+  if (MMAP[n]) return MMAP[n];
+  const m = (x && x.muscle) || muscle || 'Otro';
+  return MFB[m] || (MRANGE(m) !== undefined && AM.some(a => a[0] === m) ? { [m]: 1 } : {});
+}
 function musWeek(ws) {
   const we = addDays(ws, 7), out = {};
-  S.sessions.forEach(s => { if (s.start < ws || s.start >= we) return; s.exercises.forEach(e => {
-    const m = muscleOf(e), o = out[m] || (out[m] = { sets: 0, days: new Set() }); o.sets += e.sets.length; o.days.add(dayKey(s.start)); }); });
+  S.sessions.forEach(s => { if (s.start < ws || s.start >= we) return; s.exercises.forEach(e => { if (!e.sets.length) return;
+    Object.entries(exMus(e.exerciseId, e.name, e.muscle)).forEach(([m, w]) => {
+      const o = out[m] || (out[m] = { sets: 0, days: new Set(), ex: {} }); o.sets += e.sets.length * w; if (w >= 1) o.days.add(dayKey(s.start));
+      const k = o.ex[e.exerciseId] || (o.ex[e.exerciseId] = { name: e.name, n: 0, w }); k.n += e.sets.length; }); }); });
   return out;
 }
 function musPlan() {
   const out = {}, c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1;
-  planDays().forEach(r => { const seen = new Set(); r.items.forEach(it => { const ex = exById(it.exerciseId); const m = (ex && ex.muscle) || 'Otro';
-    const o = out[m] || (out[m] = { sets: 0, days: 0 }); o.sets += prescribe(it, ph, w).sets; if (!seen.has(m)) { seen.add(m); o.days++; } }); });
+  planDays().forEach(r => { const seen = new Set(); r.items.forEach(it => { const ex = exById(it.exerciseId) || { name: '(ejercicio)' }, n = prescribe(it, ph, w).sets;
+    Object.entries(exMus(it.exerciseId, ex.name)).forEach(([m, k]) => {
+      const o = out[m] || (out[m] = { sets: 0, days: 0, items: [] }); o.sets += n * k; o.items.push({ r, name: ex.name, id: it.exerciseId, n, w: k });
+      if (k >= 1 && !seen.has(m)) { seen.add(m); o.days++; } }); }); });
   return out;
 }
+function musSuggest(m, n = 4) {
+  const inPlan = new Set(planDays().flatMap(r => r.items.map(i => i.exerciseId))), used = new Set(S.sessions.flatMap(s => s.exercises.map(x => x.exerciseId)));
+  return S.exercises.filter(x => !inPlan.has(x.id) && (exMus(x.id)[m] || 0) >= 1).sort((a, b) => used.has(b.id) - used.has(a.id) || Object.keys(exMus(b.id)).length - Object.keys(exMus(a.id)).length).slice(0, n);
+}
+const half = v => fmtNum(Math.round(v * 2) / 2).replace('.', ',');
 function musTips(P, W) {
   const src = Object.keys(P).length ? P : W, isPlan = src === P, t = [];
-  MUSCLES.forEach(m => { const rg = MRANGE(m), o = src[m]; if (!rg) return;
-    const n = o ? o.sets : 0, d = o ? (isPlan ? o.days : o.days.size) : 0;
-    if (n <= rg[0] - 2 && (n > 0 || ['Pecho', 'Espalda', 'Cuádriceps', 'Femoral'].includes(m))) t.push(`<b>${m}</b>: ${isPlan ? 'tu plan da' : 'hiciste'} ${n} series por semana. Para que crezca conviene llegar a ${rg[0]}: sumá 1–2 series o un ejercicio.`);
-    else if (n > rg[1]) t.push(`<b>${m}</b>: ${n} series por semana es mucho. Podés bajar a ${rg[1]} sin perder progreso y recuperar mejor.`);
-    else if (n && d === 1 && rg[0] >= 10) t.push(`<b>${m}</b>: lo entrenás un solo día. Repartirlo en 2 días suele dar mejores resultados con las mismas series.`);
+  AM.forEach(([m, rg]) => { if (!rg) return;
+    const o = src[m], n = o ? o.sets : 0, d = o ? (isPlan ? o.days : o.days.size) : 0, sg = musSuggest(m, 1)[0];
+    const add = sg ? ` Por ejemplo, sumá <b>${esc(sg.name)}</b>.` : '';
+    if (!n) t.push(`<b>${m}</b>: ${isPlan ? 'tu plan no lo trabaja' : 'no lo trabajaste'}.${add}`);
+    else if (n <= rg[0] - 2) t.push(`<b>${m}</b>: ${isPlan ? 'tu plan da' : 'hiciste'} ${half(n)} series por semana. Conviene llegar a ${rg[0]}: sumá ${Math.ceil(rg[0] - n)} series.${add}`);
+    else if (n > rg[1]) t.push(`<b>${m}</b>: ${half(n)} series por semana es mucho. Podés bajar a ${rg[1]} sin perder progreso y recuperar mejor.`);
+    else if (d === 1 && rg[0] >= 10) t.push(`<b>${m}</b>: lo entrenás de forma directa un solo día. Repartirlo en 2 días suele dar mejores resultados con las mismas series.`);
   });
   return { t, isPlan };
 }
 let musOff = 0, cmpMode = 'w';
+function musStatus(m, n, pl, cur) {
+  const rg = MRANGE(m);
+  if (!rg) return n || pl ? ['ok', 'Trabajo indirecto'] : ['', 'Sin trabajo'];
+  if (cur && pl < rg[0] && n < rg[0]) return ['bajo', pl ? `Tu plan da poco (${half(pl)})` : 'Tu plan no lo trabaja'];
+  if (cur && n < pl) return ['pend', `En camino · faltan ${half(pl - n)}`];
+  if (!n) return ['bajo', 'Sin trabajar'];
+  return n > rg[1] ? ['alto', 'Alto'] : n >= rg[0] ? ['ok', 'En rango'] : ['bajo', 'Bajo'];
+}
 function vMuscles() {
-  const ws = addDays(weekStart(), 7 * musOff), W = musWeek(ws), P = musOff === 0 ? musPlan() : {};
+  const ws = addDays(weekStart(), 7 * musOff), W = musWeek(ws), P = musOff === 0 ? musPlan() : {}, cur = musOff === 0;
   let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Progreso</div><h1 style="margin-top:6px">Músculos</h1>
     <div class="row wknav"><button class="ghost" data-a="musNav" data-d="-1" aria-label="Semana anterior">‹</button><div class="sp c"><b>${musOff === 0 ? 'Esta semana' : musOff === -1 ? 'Semana pasada' : 'Semana del ' + fmtShort(ws)}</b><div class="mu sm">${fmtShort(ws)} – ${fmtShort(addDays(ws, 6))}</div></div>
     <button class="ghost" data-a="musNav" data-d="1" ${musOff >= 0 ? 'disabled' : ''} aria-label="Semana siguiente">›</button></div>`;
-  const ms = MUSCLES.filter(m => (W[m] && W[m].sets) || (P[m] && P[m].sets));
-  if (!ms.length) h += `<div class="card mu">No hay series registradas esta semana.</div>`;
-  else {
-    const top = Math.max(22, ...ms.map(m => Math.max(W[m] ? W[m].sets : 0, P[m] ? P[m].sets : 0)));
-    h += `<div class="card" style="padding:8px 18px">${ms.map(m => {
-      const n = W[m] ? W[m].sets : 0, d = W[m] ? W[m].days.size : 0, pl = P[m] ? P[m].sets : 0, rg = MRANGE(m);
-      const st = !rg ? '' : musOff === 0 && n < pl ? ['pend', `En camino · faltan ${pl - n}`] : n > rg[1] ? ['alto', 'Alto'] : n >= rg[0] ? ['ok', 'En rango'] : ['bajo', 'Bajo'];
-      return `<div class="mrow"><div class="row"><b class="sp">${esc(m)}</b><span class="mu sm">${d ? d + (d === 1 ? ' día' : ' días') + ' · ' : ''}</span><b style="font-variant-numeric:tabular-nums;margin-left:4px">${n}${pl ? `<span class="mu" style="font-weight:500"> / ${pl}</span>` : ''}</b></div>
-        <div class="mtrack">${rg ? `<i class="zone" style="left:${rg[0] / top * 100}%;width:${(rg[1] - rg[0]) / top * 100}%"></i>` : ''}<i class="fill ${st ? st[0] : ''}" style="width:${Math.min(100, n / top * 100)}%"></i>${pl ? `<i class="ptk" style="left:${Math.min(99.5, pl / top * 100)}%"></i>` : ''}</div>
-        ${st ? `<div class="mst ${st[0]}">${st[1]}${rg ? ` · ideal ${rg[0]}–${rg[1]}` : ''}</div>` : ''}</div>`; }).join('')}</div>
-      <p class="mu sm" style="margin-top:-4px">Series hechas${musOff === 0 && Object.keys(P).length ? ' / las que pide tu plan (la rayita blanca)' : ''}. La zona marcada es el rango recomendado por semana para ganar músculo.</p>`;
-  }
-  const T = musTips(musOff === 0 ? P : {}, W);
-  if (T.t.length) h += `<h2>Sugerencias${T.isPlan ? ' para tu plan' : ''}</h2><div class="card sm" style="line-height:1.5">${T.t.slice(0, 5).map(x => `<p style="margin:6px 0">${x}</p>`).join('')}</div>`;
-  else if (ms.length) h += `<div class="card sm">✓ ${T.isPlan ? 'Tu plan' : 'Esta semana'} tiene un volumen equilibrado en todos los músculos principales.</div>`;
-  // Distribución últimas 4 semanas
+  const top = Math.max(22, ...AM.map(([m]) => Math.max(W[m] ? W[m].sets : 0, P[m] ? P[m].sets : 0)));
+  [['sup', 'Tren superior'], ['inf', 'Tren inferior'], ['core', 'Zona media']].forEach(([g, gl]) => {
+    h += `<h2>${gl}</h2><div class="card" style="padding:4px 18px">${AM.filter(a => a[2] === g).map(([m, rg]) => {
+      const n = W[m] ? W[m].sets : 0, d = W[m] ? W[m].days.size : 0, pl = P[m] ? P[m].sets : 0, st = musStatus(m, n, pl, cur);
+      return `<div class="mrow clickable" data-a="openMuscle" data-k="${esc(m)}"><div class="row"><b class="sp">${esc(m)}</b><span class="mu sm">${d ? d + (d === 1 ? ' día · ' : ' días · ') : ''}</span><b style="font-variant-numeric:tabular-nums;margin-left:4px">${half(n)}${pl ? `<span class="mu" style="font-weight:500"> / ${half(pl)}</span>` : ''}</b><span class="mu" style="margin-left:8px">›</span></div>
+        <div class="mtrack">${rg ? `<i class="zone" style="left:${rg[0] / top * 100}%;width:${(rg[1] - rg[0]) / top * 100}%"></i>` : ''}<i class="fill ${st[0]}" style="width:${Math.min(100, n / top * 100)}%"></i>${pl ? `<i class="ptk" style="left:${Math.min(99.5, pl / top * 100)}%"></i>` : ''}</div>
+        <div class="mst ${st[0]}">${st[1]}${rg ? ` · ideal ${rg[0]}–${rg[1]}` : ''}</div></div>`; }).join('')}</div>`;
+  });
+  h += `<p class="mu sm">Series hechas${cur && Object.keys(P).length ? ' / las que pide tu plan (rayita blanca)' : ''}. La zona marcada es el rango recomendado por semana. Cada serie cuenta entera para el músculo principal del ejercicio y la mitad para los secundarios. Tocá un músculo para ver qué ejercicios suman.</p>`;
+  const T = musTips(cur ? P : {}, W);
+  if (T.t.length) h += `<h2>Sugerencias${T.isPlan ? ' para tu plan' : ''}</h2><div class="card sm" style="line-height:1.5">${T.t.slice(0, 6).map(x => `<p style="margin:6px 0">${x}</p>`).join('')}</div>`;
+  else h += `<div class="card sm">✓ ${T.isPlan ? 'Tu plan' : 'Esta semana'} tiene un volumen equilibrado en todos los músculos.</div>`;
   const D = {}; for (let k = 0; k < 4; k++) { const w4 = musWeek(addDays(weekStart(), -7 * k)); Object.keys(w4).forEach(m => D[m] = (D[m] || 0) + w4[m].sets); }
   const tot = Object.values(D).reduce((a, b) => a + b, 0);
   if (tot) {
     const L = Object.entries(D).sort((a, b) => b[1] - a[1]), COL = ['#b8f26b', '#7fd3ff', '#9b8cff', '#ffb347', '#ff7ab6', '#5fe3c0', '#f2e86b', '#c9a0ff'];
     h += `<h2>Cómo repartís el trabajo · últimas 4 semanas</h2><div class="card"><div class="dist">${L.map(([m, v], i) => `<i style="width:${v / tot * 100}%;background:${COL[i % COL.length]}${i >= COL.length ? ';opacity:.5' : ''}"></i>`).join('')}</div>
-      <div class="dleg">${L.map(([m, v], i) => `<span><i style="background:${COL[i % COL.length]}"></i>${esc(m)} <b>${Math.round(v / tot * 100)}%</b></span>`).join('')}</div></div>`;
+      <div class="dleg">${L.map(([m, v], i) => `<span><i style="background:${COL[i % COL.length]}${i >= COL.length ? ';opacity:.5' : ''}"></i>${esc(m)} <b>${Math.round(v / tot * 100)}%</b></span>`).join('')}</div></div>`;
   }
   // Comparar
   h += `<h2>Comparar</h2><div class="seg" style="margin-bottom:12px">${[['w', 'Semanas'], ['m', 'Meses'], ['p', 'Fases']].map(([k, l]) => `<button class="${cmpMode === k ? 'on' : ''}" data-a="cmpMode" data-k="${k}">${l}</button>`).join('')}</div>`;
@@ -1130,6 +1181,27 @@ function vMuscles() {
         <div class="tiles" style="margin-top:12px"><div class="tile"><b>${b.ss.length}</b><span>Entrenos</span></div><div class="tile"><b>${Math.round(sets / wks)}</b><span>Series/sem.</span></div><div class="tile"><b>${fmtBig(b.ss.reduce((x, s) => x + sessVol(s), 0))}</b><span>Volumen</span></div></div></div>`;
     });
   }
+  return h;
+}
+function vMuscle() {
+  const m = R.id, rg = MRANGE(m), W = musWeek(addDays(weekStart(), 7 * musOff)), P = musPlan(), o = W[m], pl = P[m];
+  const n = o ? o.sets : 0, cur = musOff === 0, st = musStatus(m, n, pl ? pl.sets : 0, cur);
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Músculo</div><h1 style="margin-top:6px">${esc(m)}</h1>
+    <div class="card"><div class="row" style="align-items:baseline"><div class="bigstat" style="font-size:44px">${half(n)}</div><span class="mu" style="margin-left:8px">series ${cur ? 'esta semana' : 'esa semana'}${pl && cur ? ` de ${half(pl.sets)} planeadas` : ''}</span></div>
+    <div class="mst ${st[0]}" style="font-size:13px">${st[1]}${rg ? ` · ideal ${rg[0]}–${rg[1]} por semana` : ''}</div>${MNOTE[m] ? `<p class="mu sm" style="margin:10px 0 0">${MNOTE[m]}</p>` : ''}</div>`;
+  const row = (name, sets, w, sub, id) => `<div class="exrow" data-a="openEx" data-id="${id}"><div class="sp"><div style="font-weight:600">${esc(name)}</div><div class="mu sm">${sub ? sub + ' · ' : ''}${w >= 1 ? 'músculo principal' : 'secundario: cuenta la mitad'}</div></div>
+    <div style="text-align:right;flex-shrink:0"><b>${half(sets * w)}</b><div class="mu sm">${sets} ${sets === 1 ? 'serie' : 'series'}${w < 1 ? ' × ½' : ''}</div></div></div>`;
+  h += `<h2>${cur ? 'Esta semana' : 'Esa semana'}</h2>`;
+  const ex = o ? Object.entries(o.ex).sort((a, b) => b[1].n * b[1].w - a[1].n * a[1].w) : [];
+  h += ex.length ? `<div class="card" style="padding:4px 18px">${ex.map(([id, x]) => row(x.name, x.n, x.w, '', id)).join('')}</div>` : `<div class="card mu">Todavía no hiciste series que trabajen este músculo ${cur ? 'esta semana' : 'esa semana'}.</div>`;
+  if (pl && pl.items.length) {
+    h += `<h2>En tu plan</h2><div class="card" style="padding:4px 18px">${pl.items.sort((a, b) => b.w - a.w).map(x => row(x.name, x.n, x.w, esc(x.r.name), x.id)).join('')}
+      <div class="row" style="padding:12px 0;font-weight:700"><span class="sp">Total por semana</span>${half(pl.sets)}</div></div>`;
+  } else h += `<h2>En tu plan</h2><div class="card mu">Ningún ejercicio de tu plan trabaja este músculo.</div>`;
+  const sg = musSuggest(m, 5), need = rg && (!pl || pl.sets < rg[0]);
+  if (sg.length) h += `<h2>${need ? 'Para sumar y llegar al rango' : 'Otras opciones'}</h2>${need ? `<p class="mu sm" style="margin-top:-4px">Te faltan ${half(rg[0] - (pl ? pl.sets : 0))} series por semana. Agregando uno de estos (3 series) a uno de tus días te acercás al objetivo.</p>` : ''}
+    <div class="card" style="padding:4px 18px">${sg.map(x => { const mm = exMus(x.id), sec = Object.keys(mm).filter(k => k !== m && mm[k] > 0);
+      return `<div class="exrow"><div class="sp"><div style="font-weight:600">${esc(x.name)}</div><div class="mu sm">${sec.length ? 'También trabaja: ' + sec.join(', ') : 'Trabajo directo'}</div></div><button class="sm" data-a="addToDay" data-id="${x.id}">+ Agregar</button></div>`; }).join('')}</div>`;
   return h;
 }
 /* ---------- Navegación ---------- */
@@ -1218,7 +1290,7 @@ function navScroll() {
 window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
-  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, muscles: vMuscles, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, muscles: vMuscles, muscle: vMuscle, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -1233,7 +1305,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', muscles: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', muscles: 'progress', muscle: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -1646,10 +1718,10 @@ function vProgress() {
     h += `<div class="card"><div class="mu sm">Fuerza en las últimas 4 semanas</div><div class="row" style="align-items:baseline;gap:10px;margin-top:4px">
       <div class="bigstat ${avg >= 0 ? 'up' : 'down'}" style="font-size:40px">${avg > 0 ? '+' : ''}${fmtNum(avg)}%</div><span class="mu sm">promedio en ${ch.length} ${ch.length === 1 ? 'ejercicio' : 'ejercicios'}</span></div></div>`; }
   if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px"><div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div><span class="mu sm">Pesos sugeridos</span></div>${dayRecsHtml(nx)}<button class="big" style="margin:8px 0 14px" data-a="openCoach">Ver pesos de todos los días</button></div>`;
-  { const W = musWeek(weekStart()), Pm = musPlan(), main = MUSCLES.filter(m => MRANGE(m) && ((W[m] && W[m].sets) || (Pm[m] && Pm[m].sets)));
+  { const W = musWeek(weekStart()), Pm = musPlan(), main = AM.filter(a => a[1]).map(a => a[0]);
     const ok = main.filter(m => W[m] && W[m].sets >= MRANGE(m)[0]).length;
     h += `<h2>Músculos</h2><div class="card clickable" data-a="openMuscles"><div class="row"><div class="sp"><div class="t" style="font-size:16px">Series por músculo y comparaciones</div>
-      <div class="mu sm">${main.length ? `Esta semana: ${ok} de ${main.length} músculos en rango` : 'Volumen semanal, frecuencia, meses y fases'}</div></div><span class="mu">›</span></div>
+      <div class="mu sm">Esta semana: ${ok} de ${main.length} músculos en rango · ver qué suma a cada uno</div></div><span class="mu">›</span></div>
       ${main.length ? `<div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div>` : ''}</div>`; }
   h += `<h2>Tu máximo estimado por ejercicio</h2><div class="card" style="padding:4px 18px">`;
   seen.forEach((name, id) => {
@@ -2469,7 +2541,7 @@ const A = {
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { if (R.view === 'coach' || R.view === 'muscles') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (R.view === 'coach' || R.view === 'muscles') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -2554,6 +2626,19 @@ const A = {
   },
   openCoach: () => go('coach'),
   openMuscles: () => { musOff = 0; go('muscles'); },
+  openMuscle: d => go('muscle', d.k),
+  addToDay: d => {
+    const days = planDays(), ex = exById(d.id); if (!ex) return;
+    if (!days.length) { toast('Primero armá un día de entrenamiento'); return; }
+    openModal(`<div class="t" style="font-size:19px">Agregar ${esc(ex.name)}</div><p class="mu sm">Se suma al final del día con 3 series, con el mismo rango de repeticiones que el resto del día. Después lo podés editar.</p>
+      ${days.map(r => `<button class="pick" data-a="addToDayGo" data-id="${r.id}" data-x="${ex.id}"><span class="sp">${esc(r.name)}</span><span class="mu sm">${r.items.length} ejercicios</span></button>`).join('')}
+      <button class="big ghost" data-a="closeModal">Cancelar</button>`);
+  },
+  addToDayGo: d => {
+    const r = S.routines.find(x => x.id === d.id); if (!r) return; const f = r.items[0] || {};
+    r.items.push({ id: uid(), exerciseId: d.x, sets: 3, repMin: f.repMin || 8, repMax: f.repMax || 12, rest: f.rest || S.settings.rest, notes: '', pct: null, rir: f.rir ?? null });
+    touch(r); const fp = r.phaseId && findPhase(r.phaseId); if (fp) touch(fp.prog); closeModal(); save(); render(); toast(`Agregado a ${r.name}: 3 series`);
+  },
   musNav: d => { musOff = Math.min(0, musOff + (+d.d)); const y = window.scrollY; render(); window.scrollTo(0, y); },
   cmpMode: d => { cmpMode = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   deloadOn: () => { S.deloadWk = weekStart(); S.updatedAt = Date.now(); save(); render(); toast('Semana de descarga activada 🔋'); },
