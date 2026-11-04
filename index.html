@@ -526,6 +526,8 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 .ic.orange{background:rgba(255,179,71,.13);color:#ffb347}.ic.pink{background:rgba(255,122,182,.12);color:#ff7ab6}
 .row>.ic+.sp,.exrow>.ic+.sp{margin-left:2px}
 #app.enter .ic{animation:pop .5s cubic-bezier(.2,.9,.3,1.3) .15s both}
+.pill2{font-size:13px;font-weight:750;padding:5px 10px;border-radius:99px;background:var(--acd);color:var(--ac);margin-right:6px;font-variant-numeric:tabular-nums}
+.pill2.down{background:rgba(255,107,107,.12);color:var(--dn)}
 </style>
 </head>
 <body>
@@ -546,7 +548,7 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '7.4';
+const KEY = 'entreno.v1', VERSION = '7.5';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -836,6 +838,8 @@ function vCoach() {
     if (c.done) h += phaseDoneCard(c);
   }
   h += deloadCard();
+  { const st = strengthSum(); if (st.avg !== null) h += `<div class="card"><div class="row" style="gap:12px">${ico('trend')}<div class="mu sm sp">Fuerza en las últimas 4 semanas</div></div>
+    <div class="row" style="align-items:baseline;gap:10px;margin-top:8px"><div class="bigstat ${st.avg >= 0 ? 'up' : 'down'}" style="font-size:40px">${st.avg > 0 ? '+' : ''}${fmtNum(st.avg).replace('.', ',')}%</div><span class="mu sm">promedio en ${st.n} ${st.n === 1 ? 'ejercicio' : 'ejercicios'}</span></div></div>`; }
   if (!days.length) return h + `<div class="card mu">Cuando tengas días en tu plan, acá vas a ver qué peso usar en cada ejercicio.</div>`;
   const ph = c ? c.ph : null, w = c ? c.wEff : 1, all = days.flatMap(r => r.items.map(it => ({ r, it, k: coach(it.exerciseId, prescribe(it, ph, w)).kind })));
   const n = kd => all.filter(x => x.k === kd).length;
@@ -1521,7 +1525,7 @@ window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
   try { seedBio(); } catch (e) {}
-  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, maxes: vMaxes, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -1536,7 +1540,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -1940,32 +1944,46 @@ function vProgress() {
   h += `<h2>Récords</h2><div class="tiles2">
     <div class="tile"><span>Mayor peso</span><b>${heavy ? fmtNum(heavy.w) + ' ' + unit() : '—'}</b><span>${heavy ? esc(heavy.name) : ''}</span></div>
     <div class="tile"><span>Más reps en una serie</span><b>${reps ? reps.r : '—'}</b><span>${reps ? esc(reps.name) : ''}</span></div></div>`;
-  const seen = new Map();
-  [...S.sessions].reverse().forEach(s => s.exercises.forEach(e => { if (!seen.has(e.exerciseId)) seen.set(e.exerciseId, e.name); }));
-  const ch = []; seen.forEach((n, id) => { const a = curE1(id), b = curE1(id, Date.now() - 28 * 864e5); if (a && b) ch.push((a - b) / b * 100); });
-  const nx = plan().next;
-  if (ch.length || nx) h += `<div class="row" style="margin:28px 0 12px"><h2 class="sp" style="margin:0">Tu entrenador</h2><button class="link" data-a="openCoach">Ver todo ›</button></div>`;
-  if (ch.length) { const avg = Math.round(ch.reduce((a, b) => a + b, 0) / ch.length * 10) / 10;
-    h += `<div class="card"><div class="row" style="gap:12px">${ico('trend')}<div class="mu sm sp">Fuerza en las últimas 4 semanas</div></div><div class="row" style="align-items:baseline;gap:10px;margin-top:8px">
-      <div class="bigstat ${avg >= 0 ? 'up' : 'down'}" style="font-size:40px">${avg > 0 ? '+' : ''}${fmtNum(avg)}%</div><span class="mu sm">promedio en ${ch.length} ${ch.length === 1 ? 'ejercicio' : 'ejercicios'}</span></div></div>`; }
-  if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px">${ico('dumbbell')}<div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div></div>${dayRecsHtml(nx)}<button class="big" style="margin:8px 0 14px" data-a="openCoach">Ver pesos de todos los días</button></div>`;
-  { const W = musWeek(weekStart()), Pm = musPlan(), main = AM.filter(a => a[1]).map(a => a[0]);
+  const st = strengthSum(), nx = plan().next, sg = (v, d = 1) => (v > 0 ? '+' : '') + fmtNum(Math.round(v * 10 ** d) / 10 ** d).replace('.', ',');
+  const kinds = {}; { const c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1; plan().act.forEach(r => r.items.forEach(it => { const k = coach(it.exerciseId, prescribe(it, ph, w)).kind; kinds[k] = (kinds[k] || 0) + 1; })); }
+  const best = st.list.filter(x => x.n > 1).sort((x, y) => y.d - x.d)[0];
+  h += `<h2>Analizar</h2>`;
+  h += `<div class="card clickable" data-a="openCoach"><div class="row">${ico('target')}<div class="sp"><div class="t" style="font-size:16px">Tu entrenador</div>
+    <div class="mu sm">${[nx ? 'Próximo: ' + esc(nx.name) : '', kinds.up ? `${kinds.up} para subir` : '', kinds.stall ? `${kinds.stall} estancados` : ''].filter(Boolean).join(' · ') || 'Qué peso usar en cada ejercicio'}</div></div>
+    ${st.avg !== null ? `<div class="pill2 ${st.avg >= 0 ? 'up' : 'down'}">${sg(st.avg)}%</div>` : ''}<span class="mu">›</span></div></div>`;
+  h += `<div class="card clickable" data-a="openMaxes"><div class="row">${ico('trend', 'blue')}<div class="sp"><div class="t" style="font-size:16px">Máximo por ejercicio</div>
+    <div class="mu sm">${st.list.length} ${st.list.length === 1 ? 'ejercicio' : 'ejercicios'}${best && best.d > 0 ? ` · más subió: ${esc(best.name)} ${sg(best.d, 0)}%` : ''}</div></div><span class="mu">›</span></div></div>`;
+  { const W = musWeek(weekStart()), main = AM.filter(a => a[1]).map(a => a[0]);
     const ok = main.filter(m => W[m] && W[m].sets >= MRANGE(m)[0]).length;
-    h += `<h2>Músculos</h2><div class="card clickable" data-a="openMuscles"><div class="row">${ico('bars', 'pink')}<div class="sp"><div class="t" style="font-size:16px">Series por músculo</div>
-      <div class="mu sm">Esta semana: ${ok} de ${main.length} músculos en rango · ver qué suma a cada uno</div></div><span class="mu">›</span></div>
-      ${main.length ? `<div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div>` : ''}</div>`; }
+    h += `<div class="card clickable" data-a="openMuscles"><div class="row">${ico('bars', 'pink')}<div class="sp"><div class="t" style="font-size:16px">Series por músculo</div>
+      <div class="mu sm">Esta semana: ${ok} de ${main.length} en rango</div></div><span class="mu">›</span></div>
+      <div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div></div>`; }
   { const L = S.body[S.body.length - 1], d = bodyDelta();
     h += `<div class="card clickable" data-a="openBody"><div class="row">${ico('scale', 'orange')}<div class="sp"><div class="t" style="font-size:16px">Cuerpo</div>
       <div class="mu sm">${L ? `${fmtNum(L.weight).replace('.', ',')} kg${L.fat != null ? ' · ' + fmtNum(L.fat).replace('.', ',') + '% grasa' : ''}${d !== null && d ? ` · ${d > 0 ? '+' : ''}${fmtNum(d).replace('.', ',')} kg en el mes` : ''}` : 'Peso, bioimpedancia y fuerza relativa'}</div></div><span class="mu">›</span></div></div>`; }
-  h += `<h2>Tu máximo estimado por ejercicio</h2><div class="card" style="padding:4px 18px">`;
-  seen.forEach((name, id) => {
-    const ser = exSeries(id); if (!ser.length) return;
-    const lastE = ser[ser.length - 1].e1, d = pct(lastE, ser[0].e1), ex = exById(id);
-    h += `<div class="exrow" data-a="openEx" data-id="${id}"><div class="sp"><div style="font-weight:600">${esc(ex ? ex.name : name)}</div>
-      <div class="mu sm">${ser.length} ${ser.length === 1 ? 'sesión' : 'sesiones'}${ser.length > 1 && d ? ` · <span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d}%</span>` : ''}</div></div>
-      ${spark(ser.slice(-12).map(x => x.e1))}<div style="width:64px;text-align:right;font-weight:700">${Math.round(lastE)}<span class="mu sm"> ${unit()}</span></div></div>`;
-  });
-  return h + `</div>`;
+  return h;
+}
+// Resumen de fuerza: cambio promedio del máximo estimado en 4 semanas y lista por ejercicio
+function strengthSum() {
+  const seen = new Map(); [...S.sessions].reverse().forEach(s => s.exercises.forEach(e => { if (!seen.has(e.exerciseId)) seen.set(e.exerciseId, e.name); }));
+  const ch = [], list = [];
+  seen.forEach((name, id) => { const a = curE1(id), b = curE1(id, Date.now() - 28 * 864e5); if (a && b) ch.push((a - b) / b * 100);
+    const ser = exSeries(id); if (!ser.length) return; const ex = exById(id);
+    list.push({ id, name: ex ? ex.name : name, ser, n: ser.length, last: ser[ser.length - 1].e1, d: pct(ser[ser.length - 1].e1, ser[0].e1) }); });
+  return { avg: ch.length ? Math.round(ch.reduce((x, y) => x + y, 0) / ch.length * 10) / 10 : null, n: ch.length, list };
+}
+let maxSort = 'rec';
+function vMaxes() {
+  const st = strengthSum(), u = unit();
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Progreso</div><h1 style="margin-top:6px">Máximo por ejercicio</h1>
+    <p class="mu sm" style="margin-top:-6px">Lo que podrías levantar una vez, calculado con tus series. Tocá un ejercicio para ver su evolución y qué peso usar.</p>`;
+  if (!st.list.length) return h + `<div class="card mu">Todavía no hay ejercicios registrados.</div>`;
+  const L = [...st.list]; if (maxSort === 'up') L.sort((a, b) => b.d - a.d); else if (maxSort === 'kg') L.sort((a, b) => b.last - a.last);
+  h += `<div class="seg" style="margin-bottom:12px">${[['rec', 'Recientes'], ['up', 'Más subieron'], ['kg', 'Más pesados']].map(([k, l]) => `<button class="${maxSort === k ? 'on' : ''}" data-a="maxSort" data-k="${k}">${l}</button>`).join('')}</div>`;
+  h += `<div class="card" style="padding:4px 18px">${L.map(x => `<div class="exrow" data-a="openEx" data-id="${x.id}"><div class="sp"><div style="font-weight:600">${esc(x.name)}</div>
+      <div class="mu sm">${x.n} ${x.n === 1 ? 'sesión' : 'sesiones'}${x.n > 1 && x.d ? ` · <span class="${x.d > 0 ? 'up' : 'down'}">${x.d > 0 ? '+' : ''}${x.d}%</span>` : ''}</div></div>
+      ${spark(x.ser.slice(-12).map(y => y.e1))}<div style="width:64px;text-align:right;font-weight:700">${Math.round(x.last)}<span class="mu sm"> ${u}</span></div></div>`).join('')}</div>`;
+  return h;
 }
 function vExercise() {
   const id = R.id, ex = exById(id), ser = exSeries(id), u = unit(), step = S.settings.step;
@@ -2828,7 +2846,7 @@ const A = {
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (R.view === 'coach' || R.view === 'muscles' || R.view === 'body') { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (['coach', 'muscles', 'body', 'maxes'].includes(R.view)) { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -2912,6 +2930,8 @@ const A = {
       <button class="big" data-a="startFree">Sesión libre</button>`);
   },
   openCoach: () => go('coach'),
+  openMaxes: () => go('maxes'),
+  maxSort: d => { maxSort = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   openMuscles: () => { musOff = 0; go('muscles'); },
   openMuscle: d => go('muscle', d.k),
   addToDay: d => {
