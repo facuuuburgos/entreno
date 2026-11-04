@@ -531,6 +531,9 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 html,body,*{scrollbar-width:none}
 ::-webkit-scrollbar{display:none;width:0;height:0}
 .rirline{padding:14px 16px;margin-bottom:12px}.rirline .rirc{margin-top:10px}
+.tfbar{display:flex;gap:6px;margin-top:12px}
+.tfbar button{flex:1;background:var(--s2);color:var(--mu);font-size:13px;font-weight:600;padding:8px 4px;border-radius:10px}
+.tfbar button.on{background:var(--tx);color:var(--bg)}
 </style>
 </head>
 <body>
@@ -551,7 +554,7 @@ html,body,*{scrollbar-width:none}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '7.7';
+const KEY = 'entreno.v1', VERSION = '7.8';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1425,9 +1428,9 @@ function vBody() {
     <div class="bigstat" style="margin-top:4px"><span class="grad">${fmtNum(L.weight).replace('.', ',')}</span><span class="mu" style="font-size:20px;font-weight:600"> kg</span></div>
     <div class="tiles" style="margin-top:12px"><div class="tile"><b>${L.fat != null ? fmtNum(L.fat).replace('.', ',') + '%' : '—'}</b><span>Grasa</span></div><div class="tile"><b>${L.muscle != null ? fmtNum(L.muscle).replace('.', ',') : '—'}</b><span>Músculo kg</span></div>
     <div class="tile"><b>${L.visceral != null ? L.visceral : hm > 0 ? (L.weight / hm / hm).toFixed(1).replace('.', ',') : '—'}</b><span>${L.visceral != null ? 'Visceral' : 'IMC'}</span></div></div></div>`;
-  const pts = B.filter(x => x[bodyM] != null).map(x => ({ x: x.date, y: x[bodyM] }));
+  const pts = tfPts(B.filter(x => x[bodyM] != null).map(x => ({ x: x.date, y: x[bodyM] })));
   h += `<div class="seg" style="margin:18px 0 10px">${Object.keys(BODYF).map(k => `<button class="${bodyM === k ? 'on' : ''}" data-a="bodyM" data-k="${k}">${BODYF[k][0]}</button>`).join('')}</div>
-    <div class="card">${pts.length > 1 ? lineChart(pts, BODYF[bodyM][1]) : `<p class="mu sm" style="margin:0">Hace falta más de una medición con este dato.</p>`}</div>`;
+    <div class="card">${pts.length > 1 ? lineChart(pts, BODYF[bodyM][1]) : `<p class="mu sm" style="margin:0">Hace falta más de una medición con este dato en este período.</p>`}${tfBar()}</div>`;
   const I = bodyInsights(); if (I.length) h += `<h2>Qué muestran tus datos</h2><div class="card sm" style="line-height:1.55">${I.map(x => `<p style="margin:6px 0">${x}</p>`).join('')}</div>`;
   const top = [...new Set(S.sessions.flatMap(s => s.exercises.map(e => e.exerciseId)))].filter(id => ['Pecho', 'Espalda', 'Cuádriceps', 'Femoral', 'Glúteo', 'Deltoide anterior'].includes(mainMus(id)) && Object.keys(exMus(id)).length > 1).map(id => ({ id, e1: curE1(id) })).filter(x => x.e1).sort((a, b) => b.e1 - a.e1).slice(0, 5);
   if (top.length) h += `<h2>Fuerza relativa</h2><div class="card" style="padding:4px 18px">${top.map(x => `<div class="exrow" data-a="openEx" data-id="${x.id}"><div class="sp" style="font-weight:600">${esc((exById(x.id) || {}).name || '')}</div>
@@ -1740,12 +1743,19 @@ function vHome() {
       const dn = P.done.has(r.id), nx = P.next && P.next.id === r.id;
       return `<div class="ps ${dn ? 'dn' : ''} ${nx ? 'nx' : ''}"><i>${dn ? '✓' : k + 1}</i><span>${esc(r.name)}</span></div>`;
     }).join('');
-    h += `<h2>Tu semana</h2><div class="card"><div class="row"><div class="sp"><span class="t">${P.count} de ${P.act.length}</span> <span class="mu">rutinas</span></div>
+    h += `<div class="row" style="margin:32px 0 12px"><h2 class="sp" style="margin:0">Tu semana</h2><button class="link" data-a="tab" data-v="consistency">Calendario</button></div><div class="card"><div class="row"><div class="sp"><span class="t">${P.count} de ${P.act.length}</span> <span class="mu">rutinas</span></div>
 </div>
       <div class="plan" style="grid-template-columns:repeat(${P.act.length},1fr)">${steps}</div></div>`;
   }
 
-  h += `<div class="row" style="margin:32px 0 12px"><h2 class="sp" style="margin:0">Constancia</h2><button class="link" data-a="tab" data-v="consistency">Ver calendario</button></div><div class="card clickable" data-a="tab" data-v="consistency"><div class="bigstat"><span class="grad" data-count="${S.sessions.length}">${S.sessions.length}</span></div><div class="mu sm" style="margin-top:4px">entrenamientos completados</div>${heatmap()}</div>`;
+  if (S.sessions.length) {
+    const st = strengthSum(), c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1, K = {};
+    P.act.forEach(r => r.items.forEach(it => { const k = coach(it.exerciseId, prescribe(it, ph, w)).kind; K[k] = (K[k] || 0) + 1; }));
+    const mo = S.sessions.filter(x => x.start >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime()).length;
+    h += `<h2>Tu progreso</h2><div class="card clickable" data-a="openCoach"><div class="row">${ico('trend')}<div class="sp">
+      <div class="t" style="font-size:16px">${st.avg !== null ? `Fuerza ${st.avg > 0 ? '+' : ''}${fmtNum(st.avg).replace('.', ',')}% en 4 semanas` : 'Tu entrenador'}</div>
+      <div class="mu sm">${[K.up ? `${K.up} ${K.up === 1 ? 'ejercicio' : 'ejercicios'} para subir` : '', K.stall ? `${K.stall} estancados` : '', `${mo} ${mo === 1 ? 'entreno' : 'entrenos'} este mes`].filter(Boolean).join(' · ')}</div></div><span class="mu">›</span></div></div>`;
+  }
   if (S.sessions.length) {
     const last = S.sessions[S.sessions.length - 1];
     h += `<div class="row" style="margin:32px 0 12px"><h2 class="sp" style="margin:0">Último entrenamiento</h2><button class="link" data-a="tab" data-v="history">Ver todo</button></div>` + sessCard(last);
@@ -1986,7 +1996,10 @@ function strengthSum() {
     list.push({ id, name: ex ? ex.name : name, ser, n: ser.length, last: ser[ser.length - 1].e1, d: pct(ser[ser.length - 1].e1, ser[0].e1) }); });
   return { avg: ch.length ? Math.round(ch.reduce((x, y) => x + y, 0) / ch.length * 10) / 10 : null, n: ch.length, list };
 }
-let maxSort = 'rec';
+let maxSort = 'rec', exM = 'e1', exAll = false, tf = 'all';
+const TF = [['1m', '1 mes', 31], ['3m', '3 meses', 92], ['6m', '6 meses', 183], ['all', 'Todo', 0]];
+function tfPts(pts) { const d = (TF.find(x => x[0] === tf) || TF[3])[2]; return d ? pts.filter(p => p.x >= Date.now() - d * 864e5) : pts; }
+function tfBar() { return `<div class="tfbar">${TF.map(([k, l]) => `<button class="${tf === k ? 'on' : ''}" data-a="tf" data-k="${k}">${l}</button>`).join('')}</div>`; }
 function vMaxes() {
   const st = strengthSum(), u = unit();
   let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Progreso</div><h1 style="margin-top:6px">Máximo por ejercicio</h1>
@@ -2018,15 +2031,26 @@ function vExercise() {
   h += `<h2>Lo que la app aprendió</h2><div class="card"><div class="mu sm">Tu máximo estimado (1RM)</div><div class="row" style="align-items:baseline;margin-top:4px;flex-wrap:wrap">
     <div class="bigstat"><span class="grad" data-count="${Math.round(e1)}">${Math.round(e1)}</span><span class="mu" style="font-size:20px;font-weight:600"> ${u}</span></div>
     ${dm ? `<span class="${dm > 0 ? 'up' : 'down'}" style="font-weight:700">${dm > 0 ? '+' : ''}${dm}% en el último mes</span>` : ser.length > 1 && d ? `<span class="${d > 0 ? 'up' : 'down'}" style="font-weight:700">${d > 0 ? '+' : ''}${d}% desde el inicio</span>` : ''}</div>
-    ${lineChart(ser.map(x => ({ x: x.date, y: x.e1 })), u)}
-    <p class="mu sm" style="margin:10px 0 0">Es el peso que podrías levantar una sola vez. La app lo calcula con tus series de las últimas 3 sesiones: peso, repeticiones y las que te sobraban.</p></div>
+    <div class="seg sm3" style="margin:14px 0 4px">${[['e1', 'Máximo'], ['w', 'Peso'], ['vol', 'Volumen']].map(([k, l]) => `<button class="${exM === k ? 'on' : ''}" data-a="exM" data-k="${k}">${l}</button>`).join('')}</div>
+    ${(() => { const pts = tfPts(ser.map(x => ({ x: x.date, y: exM === 'w' ? x.maxW : exM === 'vol' ? x.sets.reduce((a, s) => a + s.w * s.r, 0) : x.e1 }))); return pts.length > 1 ? lineChart(pts, u) : `<p class="mu sm" style="margin:16px 0">No hay suficientes sesiones en este período.</p>`; })()}
+    ${tfBar()}
+    <p class="mu sm" style="margin:10px 0 0">${exM === 'w' ? 'El mayor peso que usaste en cada sesión.' : exM === 'vol' ? 'Volumen de cada sesión: peso × repeticiones de todas las series.' : 'Es el peso que podrías levantar una sola vez.'} ${exM === 'e1' ? ' La app lo calcula con tus series de las últimas 3 sesiones: peso, repeticiones y las que te sobraban.' : ''}</p></div>
     <div class="tiles"><div class="tile"><b>${fmtNum(maxW)}</b><span>Mayor peso</span></div><div class="tile"><b>${fmtNum(best.best.w)}×${best.best.r}</b><span>Mejor serie</span></div><div class="tile"><b>${ser.length}</b><span>Sesiones</span></div></div>`;
   if (e1) h += `<h2>Tu peso según las repeticiones</h2><div class="card" style="padding:6px 18px">
     ${[5, 8, 10, 12, 15].map(n => `<div class="wrow2 ${rx && n >= rx.repMin && n <= rx.repMax ? 'on' : ''}"><span>${n} repeticiones</span><b>${fmtNum(roundTo(e1 / (1 + (n + 2) / 30), step))} ${u}</b></div>`).join('')}
     <p class="mu sm" style="margin:8px 0 10px">Dejando 2 repeticiones en reserva. En verde, el rango de tu plan actual.</p></div>`;
-  h += `<h2>Historial</h2><div class="card" style="padding:4px 18px">${[...ser].reverse().slice(0, 20).map(x => `<div class="exrow" data-a="openSession" data-id="${x.sid}">
+  // Récords: cada vez que superaste tu mejor peso o tu mejor máximo estimado
+  const PR = []; { let bw = 0, be = 0; ser.forEach((x, k) => { const t = x.best;
+    if (k && x.e1 > be * 1.001) PR.push({ date: x.date, sid: x.sid, kind: 'Máximo estimado', val: `${Math.round(x.e1)} ${u}`, set: `${fmtNum(t.w)}×${t.r}` });
+    else if (k && x.maxW > bw) PR.push({ date: x.date, sid: x.sid, kind: 'Mayor peso', val: `${fmtNum(x.maxW)} ${u}`, set: '' });
+    bw = Math.max(bw, x.maxW); be = Math.max(be, x.e1); }); }
+  if (PR.length) h += `<h2>Récords · ${PR.length}</h2><div class="card" style="padding:4px 18px">${[...PR].reverse().slice(0, exAll ? 99 : 5).map(r => `<div class="exrow" data-a="openSession" data-id="${r.sid}">
+      <div style="font-size:20px">🏆</div><div class="sp"><div style="font-weight:600">${r.kind}: ${r.val}</div><div class="mu sm">${cap(fmtDate(r.date))}${r.set ? ' · serie ' + r.set : ''}</div></div><span class="mu">›</span></div>`).join('')}</div>`;
+  const H = [...ser].reverse(), lim = exAll ? H.length : 8;
+  h += `<h2>Historial · ${H.length} ${H.length === 1 ? 'sesión' : 'sesiones'}</h2><div class="card" style="padding:4px 18px">${H.slice(0, lim).map(x => `<div class="exrow" data-a="openSession" data-id="${x.sid}">
       <div class="sp"><div style="font-weight:600">${cap(fmtDate(x.date))}</div><div class="mu sm">${x.sets.map(s => fmtNum(s.w) + '×' + s.r + (s.rir != null ? ` (${s.rir})` : '') + (s.pr ? ' 🏆' : '')).join(' · ')}</div></div>
-      <div class="mu sm" style="text-align:right;flex-shrink:0">${Math.round(x.e1)} ${u}<br>máx. est.</div></div>`).join('')}</div>
+      <div class="mu sm" style="text-align:right;flex-shrink:0"><b style="color:var(--tx)">${Math.round(x.e1)} ${u}</b> máx.<br>${fmtBig(x.sets.reduce((a, s) => a + s.w * s.r, 0))} ${u} vol.</div></div>`).join('')}
+    ${H.length > lim || (exAll && H.length > 8) ? `<button class="big ghost" style="margin:4px 0 8px" data-a="exAll">${exAll ? 'Ver menos' : `Ver todo el historial (${H.length})`}</button>` : ''}</div>
     <p class="mu sm c">Entre paréntesis, las repeticiones que te sobraban.</p>`;
   return h;
 }
@@ -2900,7 +2924,7 @@ const A = {
   },
   startFree: () => { closeModal(); if (S.active) { toast('Ya hay un entrenamiento en curso'); go('workout'); return; } startSession(null); },
   openSession: d => { closeModal(); go('session', d.id); },
-  openEx: d => { closeModal(); go('exercise', d.id); },
+  openEx: d => { exAll = false; closeModal(); go('exercise', d.id); },
   closeModal: () => closeModal(),
   confirmOk: () => { const cb = confirmCb; confirmCb = null; closeModal(); cb && cb(); },
 
@@ -2975,6 +2999,9 @@ const A = {
   },
   openCoach: () => go('coach'),
   openMaxes: () => go('maxes'),
+  tf: d => { tf = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
+  exM: d => { exM = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
+  exAll: () => { exAll = !exAll; const y = window.scrollY; render(); window.scrollTo(0, y); },
   maxSort: d => { maxSort = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   openMuscles: () => { musOff = 0; go('muscles'); },
   openMuscle: d => go('muscle', d.k),
