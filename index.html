@@ -424,6 +424,18 @@ button.tile{color:inherit;font:inherit}
 .rirc{display:flex;gap:8px;justify-content:center;margin-top:10px}
 .rirc button{width:48px;height:48px;border-radius:50%;padding:0;font-size:17px;font-weight:700;background:var(--s1)}
 .rirc button.on{background:var(--ac);color:#0a0a0b}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.grid2 .f{margin:8px 0}
+.card.coach{background:radial-gradient(120% 120% at 100% 0%,rgba(184,242,107,.1),rgba(184,242,107,0) 60%),var(--s1)}
+.cbadge{font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:99px;white-space:nowrap;background:var(--s2);color:var(--mu)}
+.cbadge.up,.cb.up{color:var(--ac)}.cbadge.up{background:var(--acd)}
+.cbadge.down,.cb.down{color:#ffb347}.cbadge.down{background:rgba(255,160,70,.12)}
+.cbadge.pct,.cb.pct{color:#9b8cff}.cbadge.pct{background:rgba(155,140,255,.12)}
+.cb{font-size:11.5px;font-weight:700;color:var(--mu);margin-top:2px}
+.wrow2{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--ln);font-variant-numeric:tabular-nums}
+.wrow2:last-of-type{border-bottom:none}
+.wrow2.on b,.wrow2.on span{color:var(--ac)}
+.bigstat.up{color:var(--ac)}.bigstat.down{color:var(--dn)}
 </style>
 </head>
 <body>
@@ -444,7 +456,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.0';
+const KEY = 'entreno.v1', VERSION = '6.1';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -631,6 +643,47 @@ function curE1(exId, before = Infinity) {
   return best;
 }
 const roundTo = (v, st) => r2(Math.round(v / st) * st);
+// Qué peso usar la próxima vez y por qué (doble progresión + % + repeticiones en reserva)
+const CB = { up: '↑ Subir', down: '↓ Bajar', keep: '= Mantener', pct: 'Según %', new: 'Primera vez' };
+function coach(exId, rx, before = Infinity) {
+  rx = rx || {};
+  const step = S.settings.step, target = rx.rir ?? 2, repMin = rx.repMin || 8, repMax = rx.repMax || 12;
+  const e1 = curE1(exId, before), last = lastFor(exId, before), u = unit();
+  if (rx.pct && e1) {
+    const w = roundTo(e1 * rx.pct / 100, step);
+    return { w, kind: 'pct', short: `${fmtNum(rx.pct)}% de tu máximo estimado (${Math.round(e1)} ${u})`,
+      msg: `Tu fase pide ${fmtNum(rx.pct)}% de tu máximo. Hoy tu máximo estimado es ${Math.round(e1)} ${u}, así que usá ${fmtNum(w)} ${u}. A medida que hagas más repeticiones, el máximo sube y el peso también.` };
+  }
+  if (!last) return { w: null, kind: 'new', short: `Elegí un peso con el que llegues a ${repMin}–${repMax} dejando ${target} en reserva`,
+    msg: `Es la primera vez. Probá un peso con el que llegues a ${repMin}–${repMax} repeticiones sintiendo que te quedaban unas ${target}. Con esa serie la app aprende tu máximo y desde la próxima te dice qué peso usar.` };
+  const sets = last.sets, lw = Math.max(0, ...sets.map(x => x.w));
+  const allTop = sets.length >= (rx.sets || 1) && sets.every(x => x.r >= repMax);
+  const rirs = sets.map(x => x.rir).filter(v => v != null), easy = rirs.length >= Math.ceil(sets.length / 2) && rirs.reduce((a, b) => a + b, 0) / rirs.length >= target + 2;
+  const low = sets.filter(x => x.r < repMin).length > sets.length / 2;
+  const seen = sets.map(x => (x.w ? fmtNum(x.w) + '×' : '') + x.r).join(', ');
+  if (lw > 0 && (allTop || easy)) return { w: r2(lw + step), kind: 'up', short: `${allTop ? `Llegaste a ${repMax} en todas` : 'Te sobraban repeticiones'}: subí ${fmtNum(step)} ${u}`,
+    msg: `La última vez hiciste ${seen}. ${allTop ? `Llegaste a ${repMax} repeticiones en todas las series` : 'Te sobraban más repeticiones de las indicadas'}: es momento de subir ${fmtNum(step)} ${u}. Con el peso nuevo vas a hacer menos repeticiones; está bien, volvés a construir hasta ${repMax}.` };
+  if (lw > 0 && low) return { w: r2(Math.max(0, lw - step)), kind: 'down', short: `No llegaste a ${repMin} en la mayoría: bajá ${fmtNum(step)} ${u}`,
+    msg: `La última vez hiciste ${seen}: en la mayoría de las series no llegaste a ${repMin}. Bajá ${fmtNum(step)} ${u} para entrenar en el rango correcto y volvé a subir cuando llegues a ${repMax}.` };
+  return { w: lw || null, kind: 'keep', short: 'Mismo peso: buscá una repetición más que la última vez',
+    msg: `La última vez hiciste ${seen}. Mantené ${lw ? fmtNum(lw) + ' ' + u : 'el mismo peso'} y tratá de sumar una repetición por serie. Cuando llegues a ${repMax} en todas, la app te va a decir que subas.` };
+}
+// Lo que pide tu plan actual para un ejercicio (si está en tu fase)
+function rxFor(exId) {
+  const c = progCtx();
+  for (const r of planDays()) { const it = r.items.find(x => x.exerciseId === exId); if (it) return Object.assign(prescribe(it, c && r.phaseId === c.ph.id ? c.ph : null, c ? c.wEff : 1), { label: r.name }); }
+  for (const r of S.routines) { if (r.archived) continue; const it = r.items.find(x => x.exerciseId === exId); if (it) return Object.assign(prescribe(it, null, 1), { label: r.name }); }
+  return null;
+}
+function dayRecsHtml(r) {
+  const c = progCtx(), f = r.phaseId ? findPhase(r.phaseId) : null, ph = f ? f.ph : null, w = c && ph && c.ph.id === ph.id ? c.wEff : 1;
+  return r.items.map(it => {
+    const ex = exById(it.exerciseId) || { name: '(ejercicio)' }, rx = prescribe(it, ph, w), k = coach(it.exerciseId, rx);
+    return `<div class="exrow" data-a="openEx" data-id="${it.exerciseId}"><div class="sp"><div style="font-weight:600">${esc(ex.name)}</div>
+      <div class="mu sm">${rx.sets} × ${repsTxt(rx.repMin, rx.repMax)}${rx.pct ? ' · ' + fmtNum(rx.pct) + '%' : ''}${rx.rir != null ? ' · RIR ' + rx.rir : ''}</div></div>
+      <div style="text-align:right;flex-shrink:0"><b style="font-variant-numeric:tabular-nums">${k.w ? fmtNum(k.w) + ' ' + unit() : '—'}</b><div class="cb ${k.kind}">${CB[k.kind]}</div></div></div>`;
+  }).join('');
+}
 const touch = o => { o.u = Date.now(); return o; };
 function copyDay(r, phId) { const c = JSON.parse(JSON.stringify(r)); c.id = uid(); c.phaseId = phId; c.u = Date.now(); c.items.forEach(it => it.id = uid()); return c; }
 function applyTpl(ph, key, items = true) {
@@ -1127,6 +1180,7 @@ function vHome() {
     h += `<div class="today"><div class="kicker" style="color:var(--ac)">Tu próximo entrenamiento · Día ${P.act.indexOf(r) + 1} de ${P.act.length}</div><div class="n">${esc(r.name)}</div>
       <div class="mu">${r.items.length} ejercicios · ~${routineMin(r)} min</div>
       ${c ? `<div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">${phaseChip(c.ph)}<span class="mu sm">Semana ${c.w} de ${c.ph.weeks} · ${rxSummary(r, c.ph, c.wEff)}</span></div>` : ''}${chips(r)}
+      <button class="link" style="margin:-6px 0 14px" data-a="dayWeights" data-id="${r.id}">Ver pesos sugeridos para hoy ›</button>
       <button class="pri big cta" style="margin:0" data-a="start" data-id="${r.id}">Empezar</button>${other}</div>`;
   } else {
     h += `<div class="today"><div class="kicker" style="color:var(--ac)">Semana completa 🔥</div><div class="n">¡Cumpliste tu plan!</div>
@@ -1196,7 +1250,7 @@ function vTrain() {
       <div class="row" style="margin:12px 0 2px;gap:8px;flex-wrap:wrap">${phaseChip(ph)}<span class="mu sm">${done ? '✓ Fase completada' : `Semana ${w} de ${ph.weeks}`}${weekParams(ph, c.wEff).deload ? ' · descarga' : ''}</span></div>
       ${timeline(prog)}</div>`;
     if (done) h += phaseDoneCard(c);
-    h += `<div class="row" style="margin:28px 0 12px"><h2 class="sp" style="margin:0">Días · ${esc(ph.name)}</h2><button class="link" data-a="openPhase" data-id="${ph.id}">Editar fase</button></div>`;
+    h += `<div class="row" style="margin:28px 0 12px"><h2 class="sp" style="margin:0">Días · ${esc(ph.name)}</h2><button class="link" data-a="bulkEdit" data-id="${ph.id}" style="margin-right:14px">Cambiar todos</button><button class="link" data-a="openPhase" data-id="${ph.id}">Editar fase</button></div>`;
     if (!P.act.length) h += `<div class="card c"><p class="mu sm" style="margin-top:0">Esta fase todavía no tiene días.</p><button class="big pri" data-a="newDay" data-id="${ph.id}">+ Agregar día</button></div>`;
     P.act.forEach((r, k) => {
       const dn = P.done.has(r.id), nx = P.next && P.next.id === r.id;
@@ -1270,7 +1324,8 @@ function vPhase() {
       <button data-a="phWeeks" data-id="${ph.id}" data-d="-1" ${ph.weeks <= 1 ? 'disabled' : ''}>−</button><b>${ph.weeks}</b><button data-a="phWeeks" data-id="${ph.id}" data-d="1">+</button></div></div>
     <label class="f"><span>Progresión automática (intensidad por semana)</span><select data-f="ph" data-k="step" data-id="${ph.id}">${[0, 1, 1.5, 2, 2.5, 3, 4, 5].map(v => `<option value="${v}" ${v == ph.step ? 'selected' : ''}>${v ? '+' + fmtNum(v) + '% por semana' : 'Sin progresión automática'}</option>`).join('')}</select></label>
     <button class="toggle ${ph.deload ? 'on' : ''}" data-a="phDeload" data-id="${ph.id}"><span class="sp"><b>Última semana de descarga</b><br><span class="mu sm">Más liviana para recuperarte antes de la próxima fase</span></span><span class="sw"><i></i></span></button>
-    <button class="big" style="margin-top:12px" data-a="tplPick" data-id="${ph.id}" data-k="apply">Aplicar valores de una plantilla</button></div>`;
+    <button class="big pri" style="margin-top:12px" data-a="bulkEdit" data-id="${ph.id}">Cambiar en todos los ejercicios</button>
+    <button class="big" data-a="tplPick" data-id="${ph.id}" data-k="apply">Aplicar valores de una plantilla</button></div>`;
   // semana por semana
   h += `<h2>Semana por semana</h2><div class="card wtab"><div class="wt-h mu"><span>Semana</span><span>Intensidad</span><span>Series</span></div>`;
   for (let w = 1; w <= ph.weeks; w++) {
@@ -1354,7 +1409,14 @@ function vProgress() {
     <div class="tile"><span>Más reps en una serie</span><b>${reps ? reps.r : '—'}</b><span>${reps ? esc(reps.name) : ''}</span></div></div>`;
   const seen = new Map();
   [...S.sessions].reverse().forEach(s => s.exercises.forEach(e => { if (!seen.has(e.exerciseId)) seen.set(e.exerciseId, e.name); }));
-  h += `<h2>Ejercicios · fuerza estimada (1RM)</h2><div class="card" style="padding:4px 18px">`;
+  const ch = []; seen.forEach((n, id) => { const a = curE1(id), b = curE1(id, Date.now() - 28 * 864e5); if (a && b) ch.push((a - b) / b * 100); });
+  const nx = plan().next;
+  if (ch.length || nx) h += `<h2>Tu entrenador</h2>`;
+  if (ch.length) { const avg = Math.round(ch.reduce((a, b) => a + b, 0) / ch.length * 10) / 10;
+    h += `<div class="card"><div class="mu sm">Fuerza en las últimas 4 semanas</div><div class="row" style="align-items:baseline;gap:10px;margin-top:4px">
+      <div class="bigstat ${avg >= 0 ? 'up' : 'down'}" style="font-size:40px">${avg > 0 ? '+' : ''}${fmtNum(avg)}%</div><span class="mu sm">promedio en ${ch.length} ${ch.length === 1 ? 'ejercicio' : 'ejercicios'}</span></div></div>`; }
+  if (nx) h += `<div class="card" style="padding:4px 18px"><div class="row" style="padding:14px 0 6px"><div class="sp"><div class="kicker" style="font-size:11px">Tu próximo día</div><div class="t">${esc(nx.name)}</div></div><span class="mu sm">Pesos sugeridos</span></div>${dayRecsHtml(nx)}</div>`;
+  h += `<h2>Tu máximo estimado por ejercicio</h2><div class="card" style="padding:4px 18px">`;
   seen.forEach((name, id) => {
     const ser = exSeries(id); if (!ser.length) return;
     const lastE = ser[ser.length - 1].e1, d = pct(lastE, ser[0].e1), ex = exById(id);
@@ -1365,23 +1427,33 @@ function vProgress() {
   return h + `</div>`;
 }
 function vExercise() {
-  const id = R.id, ex = exById(id), ser = exSeries(id);
-  const name = ex ? ex.name : 'Ejercicio';
+  const id = R.id, ex = exById(id), ser = exSeries(id), u = unit(), step = S.settings.step;
+  const name = ex ? ex.name : 'Ejercicio', rx = rxFor(id), k = coach(id, rx);
   let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div>
     <div class="kicker">${esc(ex ? ex.muscle : '')}</div><h1 style="margin-top:6px">${esc(name)}</h1>`;
-  if (!ser.length) return h + `<div class="card mu">Todavía no registraste este ejercicio.</div>`;
-  const best = ser.reduce((b, x) => x.e1 > b.e1 ? x : b, ser[0]), maxW = Math.max(...ser.map(x => x.maxW));
-  const d = pct(ser[ser.length - 1].e1, ser[0].e1);
-  h += `<div class="card"><div class="mu sm">Fuerza estimada (1RM)</div><div class="row" style="align-items:baseline;margin-top:4px">
-    <div class="bigstat"><span class="grad" data-count="${Math.round(ser[ser.length - 1].e1)}">${Math.round(ser[ser.length - 1].e1)}</span><span class="mu" style="font-size:20px;font-weight:600"> ${unit()}</span></div>
-    ${ser.length > 1 && d ? `<span class="${d > 0 ? 'up' : 'down'}" style="font-weight:700">${d > 0 ? '+' : ''}${d}% desde el inicio</span>` : ''}</div>
-    ${lineChart(ser.map(x => ({ x: x.date, y: x.e1 })), unit())}</div>
-    <div class="tiles"><div class="tile"><b>${fmtNum(maxW)}</b><span>Mayor peso</span></div><div class="tile"><b>${fmtNum(best.best.w)}×${best.best.r}</b><span>Mejor serie</span></div><div class="tile"><b>${ser.length}</b><span>Sesiones</span></div></div>
-    <h2>Historial</h2><div class="card" style="padding:4px 18px">${[...ser].reverse().slice(0, 15).map(x => `<div class="exrow" data-a="openSession" data-id="${x.sid}">
-      <div class="sp"><div style="font-weight:600">${cap(fmtDate(x.date))}</div><div class="mu sm">${x.sets.map(s => fmtNum(s.w) + '×' + s.r + (s.pr ? ' 🏆' : '')).join(' · ')}</div></div><span class="mu">›</span></div>`).join('')}</div>`;
+  // Qué hacer la próxima vez
+  h += `<div class="card coach"><div class="row" style="align-items:flex-start"><div class="sp"><div class="kicker" style="font-size:11px">Próxima vez${rx ? ' · ' + esc(rx.label) : ''}</div>
+    <div class="bigstat" style="font-size:42px;margin-top:6px">${k.w ? fmtNum(k.w) + `<span class="mu" style="font-size:20px;font-weight:600"> ${u}</span>` : '—'}</div>
+    ${rx ? `<div class="mu sm" style="margin-top:4px">${rx.sets} series × ${repsTxt(rx.repMin, rx.repMax)} reps${rx.rir != null ? ` · dejando ${rx.rir} en reserva` : ''}</div>` : ''}</div>
+    <span class="cbadge ${k.kind}">${CB[k.kind]}</span></div><p class="sm" style="margin:14px 0 0;line-height:1.5">${esc(k.msg)}</p></div>`;
+  if (!ser.length) return h + `<div class="card mu">Todavía no registraste este ejercicio. Después del primer entrenamiento vas a ver acá tu máximo estimado y su evolución.</div>`;
+  const e1 = curE1(id), e1m = curE1(id, Date.now() - 28 * 864e5), dm = e1 && e1m ? pct(e1, e1m) : null;
+  const best = ser.reduce((b, x) => x.e1 > b.e1 ? x : b, ser[0]), maxW = Math.max(...ser.map(x => x.maxW)), d = pct(ser[ser.length - 1].e1, ser[0].e1);
+  h += `<h2>Lo que la app aprendió</h2><div class="card"><div class="mu sm">Tu máximo estimado (1RM)</div><div class="row" style="align-items:baseline;margin-top:4px;flex-wrap:wrap">
+    <div class="bigstat"><span class="grad" data-count="${Math.round(e1)}">${Math.round(e1)}</span><span class="mu" style="font-size:20px;font-weight:600"> ${u}</span></div>
+    ${dm ? `<span class="${dm > 0 ? 'up' : 'down'}" style="font-weight:700">${dm > 0 ? '+' : ''}${dm}% en el último mes</span>` : ser.length > 1 && d ? `<span class="${d > 0 ? 'up' : 'down'}" style="font-weight:700">${d > 0 ? '+' : ''}${d}% desde el inicio</span>` : ''}</div>
+    ${lineChart(ser.map(x => ({ x: x.date, y: x.e1 })), u)}
+    <p class="mu sm" style="margin:10px 0 0">Es el peso que podrías levantar una sola vez. La app lo calcula con tus series de las últimas 3 sesiones: peso, repeticiones y las que te sobraban.</p></div>
+    <div class="tiles"><div class="tile"><b>${fmtNum(maxW)}</b><span>Mayor peso</span></div><div class="tile"><b>${fmtNum(best.best.w)}×${best.best.r}</b><span>Mejor serie</span></div><div class="tile"><b>${ser.length}</b><span>Sesiones</span></div></div>`;
+  if (e1) h += `<h2>Tu peso según las repeticiones</h2><div class="card" style="padding:6px 18px">
+    ${[5, 8, 10, 12, 15].map(n => `<div class="wrow2 ${rx && n >= rx.repMin && n <= rx.repMax ? 'on' : ''}"><span>${n} repeticiones</span><b>${fmtNum(roundTo(e1 / (1 + (n + 2) / 30), step))} ${u}</b></div>`).join('')}
+    <p class="mu sm" style="margin:8px 0 10px">Dejando 2 repeticiones en reserva. En verde, el rango de tu plan actual.</p></div>`;
+  h += `<h2>Historial</h2><div class="card" style="padding:4px 18px">${[...ser].reverse().slice(0, 20).map(x => `<div class="exrow" data-a="openSession" data-id="${x.sid}">
+      <div class="sp"><div style="font-weight:600">${cap(fmtDate(x.date))}</div><div class="mu sm">${x.sets.map(s => fmtNum(s.w) + '×' + s.r + (s.rir != null ? ` (${s.rir})` : '') + (s.pr ? ' 🏆' : '')).join(' · ')}</div></div>
+      <div class="mu sm" style="text-align:right;flex-shrink:0">${Math.round(x.e1)} ${u}<br>máx. est.</div></div>`).join('')}</div>
+    <p class="mu sm c">Entre paréntesis, las repeticiones que te sobraban.</p>`;
   return h;
 }
-
 /* ---------- Entrenamiento guiado ---------- */
 const pending = e => !e.skipped && e.sets.some(s => !s.done);
 function nextPending(a, from) {
@@ -1401,10 +1473,9 @@ function sug(e, j, last) {
     hint = `${fmtNum(e.pct)}% de tu máximo estimado (${Math.round(e1)} ${unit()})${e.rir != null ? ` · terminá con ${e.rir} ${e.rir === 1 ? 'repetición' : 'repeticiones'} en reserva` : ''}`;
   } else if (last) {
     const ls = last.sets[j] || last.sets[last.sets.length - 1];
-    const allTop = last.sets.length >= e.plannedSets && last.sets.every(s => s.r >= e.repMax);
-    if (allTop && ls.w > 0) { w = r2(ls.w + step); r = e.repMin; hint = `Llegaste a ${e.repMax} reps en todas: hoy subí ${fmtNum(step)} ${unit()}`; }
-    else if (ls.r < e.repMax) { w = ls.w; r = Math.min(e.repMax, ls.r + 1); hint = 'Objetivo: una repetición más que la última vez'; }
-    else { w = ls.w; r = ls.r; hint = 'Objetivo: igualar la última vez'; }
+    const k = coach(e.exerciseId, { sets: e.plannedSets, repMin: e.repMin, repMax: e.repMax, rir: e.rir }, S.active ? S.active.start : Infinity);
+    w = k.w ?? ls.w; hint = k.short;
+    r = k.kind === 'up' || k.kind === 'down' ? e.repMin : Math.max(e.repMin, Math.min(e.repMax, ls.r + 1));
   } else if (e.startW != null && e.startW !== '') { w = e.startW; hint = 'Peso de referencia'; }
   else if (e.pct || e.rir != null) hint = `Elegí un peso con el que te queden ~${target} repeticiones en reserva. Con esta serie la app aprende tu máximo.`;
   if (j > 0 && e.sets[j - 1].done) {
@@ -1928,10 +1999,18 @@ function vSession() {
     ${isFresh ? '' : `<h1 style="margin-top:6px">${esc(s.name)}</h1>`}
     <div class="tiles" style="margin-top:16px"><div class="tile"><b>${fmtDur(s.end - s.start)}</b><span>Duración</span></div>
     <div class="tile"><b>${sessSets(s)}</b><span>Series</span></div><div class="tile"><b>${fmtBig(sessVol(s))}</b><span>Volumen (${unit()})</span></div></div>`;
-  if (isFresh) h += `<button class="pri big cta" style="margin-top:12px" data-a="share" data-id="${s.id}" class="glowpulse"><span class="row" style="justify-content:center;gap:10px">${SHARE_ICO}Compartir mi entrenamiento</span></button>`;
+  if (isFresh) h += `<button class="pri big cta glowpulse" style="margin-top:12px" data-a="share" data-id="${s.id}"><span class="row" style="justify-content:center;gap:10px">${SHARE_ICO}Compartir mi entrenamiento</span></button>`;
   if (prs || (prev && dv)) h += `<div class="card row" style="margin-top:8px;justify-content:center;gap:16px;flex-wrap:wrap">
     ${prs ? `<span class="badge gold" style="font-size:13px">🏆 ${prs} ${prs === 1 ? 'récord' : 'récords'}</span>` : ''}
     ${prev && dv ? `<span class="sm"><b class="${dv > 0 ? 'up' : 'down'}">${dv > 0 ? '+' : ''}${dv}%</b> <span class="mu">volumen vs. la vez anterior</span></span>` : ''}</div>`;
+  const isLast = S.sessions[S.sessions.length - 1] && S.sessions[S.sessions.length - 1].id === s.id;
+  const rt = s.routineId && S.routines.find(r => r.id === s.routineId);
+  if (isLast && s.exercises.length) {
+    h += `<h2>Para la próxima</h2><div class="card" style="padding:4px 18px">${s.exercises.map(e => {
+      const it = rt && rt.items.find(x => x.exerciseId === e.exerciseId), rx = it ? rxFor(e.exerciseId) || prescribe(it, null, 1) : null, k = coach(e.exerciseId, rx);
+      return `<div class="exrow" data-a="openEx" data-id="${e.exerciseId}"><div class="sp"><div style="font-weight:600">${esc(e.name)}</div><div class="mu sm">${esc(k.short)}</div></div>
+        <div style="text-align:right;flex-shrink:0"><b>${k.w ? fmtNum(k.w) + ' ' + unit() : '—'}</b><div class="cb ${k.kind}">${CB[k.kind]}</div></div></div>`; }).join('')}</div>`;
+  }
   h += `<h2>Ejercicios</h2>`;
   s.exercises.forEach(e => {
     h += `<div class="card"><div class="t clickable" data-a="openEx" data-id="${e.exerciseId}">${esc(e.name)}${e.unilateral ? ' <span class="mu sm">(c/lado)</span>' : ''} <span class="mu">›</span></div>
@@ -2221,6 +2300,54 @@ const A = {
           <span class="sm ${nx ? 'up' : 'mu'}">${nx ? 'Siguiente' : dn ? '✓ Hecha' : ''}</span></button>`;
       }).join('')}
       <button class="big" data-a="startFree">Sesión libre</button>`);
+  },
+  dayWeights: d => {
+    const r = S.routines.find(x => x.id === d.id); if (!r) return;
+    openModal(`<div class="row"><div class="sp"><div class="kicker" style="font-size:11px">Pesos sugeridos</div><div class="t" style="font-size:19px">${esc(r.name)}</div></div><button class="ghost" data-a="closeModal">Cerrar</button></div>
+      <div style="margin-top:6px">${dayRecsHtml(r)}</div>
+      <p class="mu sm" style="margin-bottom:0">Tocá un ejercicio para ver por qué y cómo vas progresando.</p>
+      <button class="big pri" data-a="start" data-id="${r.id}">Empezar</button>`);
+  },
+  bulkEdit: d => {
+    const f = findPhase(d.id); if (!f) return;
+    const days = f.ph.days.map(id => S.routines.find(r => r.id === id)).filter(Boolean), n = days.reduce((a, r) => a + r.items.length, 0);
+    const opt = (vals, lbl = v => v) => vals.map(v => `<option value="${v}">${lbl(v)}</option>`).join('');
+    openModal(`<div class="t" style="font-size:19px">Cambiar en todos los ejercicios</div>
+      <p class="mu sm">Elegí solo lo que quieras cambiar. Lo que dejes en “—” queda como está.</p>
+      <div class="grid2">
+        <label class="f"><span>Series</span><select id="be_sets"><option value="">—</option>${opt([1, 2, 3, 4, 5, 6, 8])}</select></label>
+        <label class="f"><span>Descanso</span><select id="be_rest"><option value="">—</option>${opt(RESTS, fmtRest)}</select></label>
+        <label class="f"><span>Reps mínimas</span><input id="be_rmin" inputmode="numeric" placeholder="—"></label>
+        <label class="f"><span>Reps máximas</span><input id="be_rmax" inputmode="numeric" placeholder="—"></label>
+        <label class="f"><span>% del máximo</span><input id="be_pct" inputmode="decimal" placeholder="— (0 = sin %)"></label>
+        <label class="f"><span>RIR</span><select id="be_rir"><option value="">—</option><option value="x">Sin RIR</option>${opt([0, 1, 2, 3, 4])}</select></label>
+      </div>
+      <div class="f"><span>Aplicar en</span><div class="chips" id="be_days">${days.map(r => `<button class="chip on" data-a="beDay" data-id="${r.id}">${esc(r.name)}</button>`).join('')}</div>
+      ${f.prog.phases.length > 1 ? `<button class="toggle" id="be_all" data-a="beAll" style="margin-top:6px"><span class="sp"><b>En todas las fases del programa</b><br><span class="mu sm">No solo en “${esc(f.ph.name)}”</span></span><span class="sw"><i></i></span></button>` : ''}</div>
+      <button class="big pri" data-a="bulkApply" data-id="${f.ph.id}">Aplicar</button><button class="big ghost" data-a="closeModal">Cancelar</button>`);
+  },
+  beDay: (d, el) => el.classList.toggle('on'),
+  beAll: (d, el) => { el.classList.toggle('on'); const on = el.classList.contains('on'); document.querySelectorAll('#be_days .chip').forEach(c => { c.disabled = on; c.style.opacity = on ? .35 : ''; }); },
+  bulkApply: d => {
+    const f = findPhase(d.id); if (!f) return;
+    const val = id => ($('#' + id) || {}).value || '';
+    const sets = parseInt(val('be_sets')), rest = parseInt(val('be_rest')), rmin = parseInt(val('be_rmin')), rmax = parseInt(val('be_rmax'));
+    const pc = val('be_pct').trim(), pcn = num(pc), rir = val('be_rir');
+    if (!sets && !rest && !rmin && !rmax && pc === '' && rir === '') { toast('Elegí al menos un valor para cambiar'); return; }
+    const all = $('#be_all') && $('#be_all').classList.contains('on');
+    const ids = all ? f.prog.phases.flatMap(p => p.days) : [...document.querySelectorAll('#be_days .chip.on')].map(c => c.dataset.id);
+    if (!ids.length) { toast('Elegí al menos un día'); return; }
+    let n = 0;
+    ids.forEach(id => { const r = S.routines.find(x => x.id === id); if (!r) return;
+      r.items.forEach(it => {
+        if (sets) it.sets = sets; if (rest) it.rest = rest;
+        if (rmin) it.repMin = rmin; if (rmax) it.repMax = rmax;
+        if (it.repMin > it.repMax) [it.repMin, it.repMax] = [it.repMax, it.repMin];
+        if (pc !== '' && Number.isFinite(pcn)) it.pct = pcn > 0 ? Math.min(100, pcn) : null;
+        if (rir !== '') it.rir = rir === 'x' ? null : +rir;
+        n++;
+      }); touch(r); });
+    touch(f.prog); closeModal(); save(); render(); toast(`Listo: cambiado en ${n} ${n === 1 ? 'ejercicio' : 'ejercicios'}`);
   },
   dismissProgNew: () => { S.progNew = false; save(false); render(); },
   openProgram: d => { closeModal(); go('program', d.id); },
