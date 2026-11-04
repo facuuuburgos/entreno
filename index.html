@@ -492,12 +492,15 @@ details.tech li{margin:4px 0}
 @keyframes xf{0%,38%{opacity:0}62%,100%{opacity:1}}
 @media (prefers-reduced-motion:reduce){.exph .b{animation:none;opacity:0}.exph .exl i:first-child{animation:none}}
 .sheet .exph{margin-top:4px}
-.pvh{display:flex;gap:5px;height:110px;align-items:flex-end;margin-top:16px;padding-top:14px;border-top:1.5px dashed rgba(255,255,255,.14)}
-.pvh div{flex:1;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;position:relative}
-.pvh i{display:block;width:100%;border-radius:6px 6px 3px 3px;background:#ff7ab6;min-height:3px}
+.pvh{display:flex;gap:6px;height:150px;margin-top:20px;padding-top:22px;position:relative}
+.pvh:before{content:"";position:absolute;left:0;right:0;top:22px;border-top:1.5px dashed rgba(255,255,255,.16)}
+.pvh>div{flex:1;display:flex;flex-direction:column;height:100%;min-width:0}
+.pvh .bw{flex:1;position:relative}
+.pvh i{position:absolute;left:0;right:0;bottom:0;border-radius:6px 6px 3px 3px;background:#ff7ab6;min-height:3px}
 .pvh .ok i{background:var(--ac)}.pvh .part i{background:#ffb347}.pvh .cur i{background:#7fd3ff}.pvh .zero i{background:var(--s3)}
-.pvh b{position:absolute;top:-16px;font-size:10px;color:var(--mu);font-weight:600}
-.pvh span{font-size:9px;color:var(--mu2);margin-top:5px;white-space:nowrap}
+.pvh b{position:absolute;left:0;right:0;text-align:center;font-size:11px;color:var(--tx);font-weight:650;font-variant-numeric:tabular-nums}
+.pvh .zero b{color:var(--mu)}
+.pvh span{font-size:9.5px;color:var(--mu2);margin-top:6px;text-align:center;white-space:nowrap}
 @keyframes grx{from{transform:scaleX(0)}}
 @keyframes gry{from{transform:scaleY(0)}}
 @keyframes draw{from{stroke-dashoffset:1}}
@@ -537,7 +540,7 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '7.2';
+const KEY = 'entreno.v1', VERSION = '7.3';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2256,9 +2259,9 @@ function vConsistency() {
   const W0 = Math.max(weekStart(S.sessions[0].start), addDays(weekStart(), -7 * 11)), wk = []; for (let t = W0; t <= weekStart(); t = addDays(t, 7)) wk.push(t);
   const done = wk.map(cnt), past = wk.slice(0, -1), pd = done.slice(0, -1);
   const plan = past.length * goal, got = pd.reduce((a, v) => a + Math.min(v, goal), 0), adh = plan ? Math.round(got / plan * 100) : null, miss = plan - got;
-  h += `<h2>Planeado contra hecho</h2><div class="card">${adh !== null ? `<div class="row" style="align-items:baseline;gap:10px"><div class="bigstat ${adh >= 80 ? 'up' : ''}" style="font-size:40px">${adh}%</div><span class="mu sm">de los entrenos planeados en ${past.length} ${past.length === 1 ? 'semana' : 'semanas'}</span></div>` : ''}
-    <div class="pvh">${wk.map((t, i) => { const v = done[i], cur = i === wk.length - 1; return `<div class="${cur ? 'cur' : v >= goal ? 'ok' : v ? 'part' : 'zero'}"><i style="height:${Math.min(100, v / goal * 100)}%"></i><b>${v}</b><span>${new Date(t).getDate()}/${new Date(t).getMonth() + 1}</span></div>`; }).join('')}</div>
-    <p class="mu sm" style="margin:8px 0 0">Tu objetivo: ${goal} por semana (la línea de arriba).${miss > 0 ? ` En este tiempo quedaron ${miss} ${miss === 1 ? 'entreno' : 'entrenos'} sin hacer.` : ' ¡No te faltó ninguno!'}${done[done.length - 1] < goal ? ` Esta semana te ${goal - done[done.length - 1] === 1 ? 'falta 1' : `faltan ${goal - done[done.length - 1]}`}.` : ''}</p></div>`;
+  h += `<h2>Planeado contra hecho</h2><div class="card">${adh !== null ? `<div class="bigstat ${adh >= 80 ? 'up' : ''}" style="font-size:40px;line-height:1">${adh}%</div><div class="mu sm" style="margin-top:6px">de los entrenos planeados en las últimas ${past.length === 1 ? 'semana' : past.length + ' semanas'}</div>` : ''}
+    <div class="pvh">${wk.map((t, i) => { const v = done[i], cur = i === wk.length - 1; return `<div class="${cur ? 'cur' : v >= goal ? 'ok' : v ? 'part' : 'zero'}"><div class="bw"><i style="height:${Math.min(100, v / goal * 100)}%"></i><b style="bottom:calc(${Math.min(100, v / goal * 100)}% + 5px)">${v}</b></div><span>${new Date(t).getDate()}/${new Date(t).getMonth() + 1}</span></div>`; }).join('')}</div>
+    <p class="mu sm" style="margin:8px 0 0">Tu objetivo: ${goal} por semana (la línea punteada).${miss > 0 ? ` En este tiempo quedaron ${miss} ${miss === 1 ? 'entreno' : 'entrenos'} sin hacer.` : ' ¡No te faltó ninguno!'}${done[done.length - 1] < goal ? ` Esta semana te ${goal - done[done.length - 1] === 1 ? 'falta 1' : `faltan ${goal - done[done.length - 1]}`}.` : ''}</p></div>`;
   const pdays = planDays();
   if (pdays.length > 1 && past.length >= 3) {
     const sk = pdays.map(r => ({ r, n: past.filter(t => !S.sessions.some(s => s.routineId === r.id && s.start >= t && s.start < addDays(t, 7))).length })).sort((a, b) => b.n - a.n);
