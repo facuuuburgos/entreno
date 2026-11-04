@@ -465,6 +465,21 @@ button.tile{color:inherit;font:inherit}
 .mini i{flex:1;height:100%;background:var(--s2);border-radius:5px;position:relative;overflow:hidden}
 .mini i b{position:absolute;left:0;right:0;bottom:0;background:#ff7ab6;border-radius:5px}
 .mini i.ok b{background:var(--ac)}.mini i.alto b{background:#ffb347}
+.star{background:none;border:none;font-size:20px;color:var(--mu2);padding:4px 10px 4px 0;line-height:1}
+.star.on{color:#f2c94c}
+.chips.hs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.chips.hs::-webkit-scrollbar{display:none}
+.chips.hs .chip{flex-shrink:0}
+.chip.sm2{font-size:12.5px;padding:6px 11px}
+.chip.half{background:var(--acd);color:var(--ac);border-color:transparent}
+.mchip.on{background:var(--acd);color:var(--ac)}
+details.tech summary{display:flex;justify-content:space-between;align-items:center;cursor:pointer;list-style:none}
+details.tech summary::-webkit-details-marker{display:none}
+details.tech summary::after{content:'›';color:var(--mu);margin-left:8px;transition:transform .2s}
+details.tech[open] summary::after{transform:rotate(90deg)}
+details.tech summary .mu{margin-left:auto}
+details.tech ol,details.tech ul{margin:12px 0 0;padding-left:20px;line-height:1.5;font-size:14.5px}
+details.tech li{margin:4px 0}
 </style>
 </head>
 <body>
@@ -485,7 +500,7 @@ button.tile{color:inherit;font:inherit}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '6.7';
+const KEY = 'entreno.v1', VERSION = '6.8';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1047,6 +1062,89 @@ function barChart(vals, labels, hi = -1) {
       <text x="${(x + bw / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${on ? '#e9e9ee' : '#8a8a94'}">${v ? fmtBig(v) : ''}</text>
       <text x="${(x + bw / 2).toFixed(1)}" y="${H - 5}" text-anchor="middle" font-size="9.5" fill="#8a8a94">${esc(labels[i])}</text>`; }).join('')}</svg>`;
 }
+// Ficha de cada ejercicio: equipamiento, cómo hacerlo y errores frecuentes
+const INFO = (() => { const I = {
+  'Press de banca con barra': ['Barra', ['Acostate con los ojos debajo de la barra, pies firmes en el piso y omóplatos juntos y hacia abajo.', 'Agarrá un poco más ancho que los hombros, bajá la barra controlada hasta la parte baja del pecho.', 'Empujá hacia arriba y un poco hacia atrás, sin despegar la cola del banco.'], ['Abrir los codos a 90°: llevalos a unos 45–70° del cuerpo para cuidar el hombro.', 'Rebotar la barra en el pecho.', 'Perder la retracción de los omóplatos al subir.']],
+  'Press inclinado con barra': ['Barra', ['Banco a 30–45°. Omóplatos juntos y hacia abajo, pies firmes.', 'Bajá la barra hasta debajo de las clavículas, con los codos un poco por delante de la barra.', 'Empujá hasta casi estirar los brazos sin bloquear de golpe.'], ['Banco demasiado inclinado: pasa a trabajar casi todo hombro.', 'Bajar la barra al medio del pecho como en plano.', 'Levantar la cola del banco para empujar más.']],
+  'Press de banca con mancuernas': ['Mancuernas', ['Acostado con las mancuernas a la altura del pecho, omóplatos juntos.', 'Bajá abriendo los codos a unos 45°, hasta sentir estiramiento en el pecho.', 'Empujá juntando un poco las mancuernas arriba, sin chocarlas.'], ['Bajar poco: aprovechá el mayor rango que dan las mancuernas.', 'Codos totalmente abiertos en línea con los hombros.']],
+  'Press inclinado con mancuernas': ['Mancuernas', ['Banco a 30–45°, mancuernas a la altura del pecho alto.', 'Bajá controlado hasta sentir el estiramiento, codos a unos 45°.', 'Empujá hacia arriba sobre los hombros.'], ['Inclinar demasiado el banco.', 'Dejar caer las mancuernas en la bajada.']],
+  'Press en máquina': ['Máquina', ['Ajustá el asiento para que las manijas queden a la altura del pecho medio.', 'Espalda apoyada y omóplatos juntos; empujá sin bloquear los codos.', 'Volvé lento hasta sentir estiramiento.'], ['Asiento muy alto o muy bajo.', 'Despegar la espalda del respaldo.']],
+  'Aperturas con mancuernas': ['Mancuernas', ['Acostado, mancuernas arriba con los codos apenas flexionados.', 'Abrí los brazos en arco hasta sentir estiramiento en el pecho.', 'Cerrá como abrazando un árbol, sin estirar los codos.'], ['Flexionar y estirar los codos: se convierte en un press.', 'Bajar demasiado con peso pesado: estresa el hombro.']],
+  'Cruces en polea': ['Polea', ['Poleas altas o medias, un paso adelante y torso apenas inclinado.', 'Codos fijos y levemente flexionados, juntá las manos delante del pecho.', 'Volvé lento hasta sentir el estiramiento.'], ['Usar el envión del cuerpo.', 'Mover los codos en vez de los hombros.']],
+  'Pec deck': ['Máquina', ['Asiento con las manijas a la altura del pecho, espalda apoyada.', 'Juntá los brazos con los codos levemente flexionados.', 'Abrí lento hasta sentir estiramiento sin pasarte.'], ['Hombros adelantados al juntar.', 'Golpear las manijas adelante.']],
+  'Fondos en paralelas': ['Peso corporal', ['Brazos estirados sobre las paralelas, torso un poco inclinado adelante.', 'Bajá hasta que los hombros queden a la altura de los codos o un poco más abajo.', 'Empujá hasta estirar los brazos.'], ['Bajar demasiado si te molesta el hombro.', 'Encoger los hombros hacia las orejas.']],
+  'Flexiones': ['Peso corporal', ['Manos algo más anchas que los hombros, cuerpo recto de la cabeza a los talones.', 'Bajá el pecho casi hasta el piso con los codos a unos 45°.', 'Empujá manteniendo el abdomen firme.'], ['Cadera caída o levantada.', 'Hacer medio recorrido.']],
+  'Press militar con barra': ['Barra', ['De pie, barra a la altura de las clavículas, glúteos y abdomen apretados.', 'Empujá la barra hacia arriba pasando la cabeza un poco hacia atrás.', 'Terminá con la barra sobre la mitad del pie y bajá controlado.'], ['Arquear mucho la zona lumbar.', 'Empujar la barra hacia adelante en vez de hacia arriba.']],
+  'Press de hombro con mancuernas': ['Mancuernas', ['Sentado con respaldo, mancuernas a la altura de las orejas.', 'Empujá hacia arriba hasta casi estirar los brazos.', 'Bajá controlado hasta la altura de las orejas.'], ['Arquear la espalda separándola del respaldo.', 'Bajar muy poco.']],
+  'Press de hombro en máquina': ['Máquina', ['Ajustá el asiento para que las manijas queden a la altura de los hombros.', 'Empujá hacia arriba sin bloquear los codos.', 'Volvé lento.'], ['Asiento mal regulado.', 'Despegar la espalda.']],
+  'Elevaciones laterales': ['Mancuernas', ['De pie, mancuernas al costado, torso apenas inclinado adelante.', 'Subí los brazos hacia los costados hasta la altura de los hombros, codos levemente flexionados.', 'Bajá lento.'], ['Hacer envión con el cuerpo.', 'Subir los hombros hacia las orejas (trabaja trapecio).', 'Usar demasiado peso: este ejercicio rinde con peso moderado.']],
+  'Elevaciones laterales en polea': ['Polea', ['Polea baja del lado contrario al brazo que trabaja.', 'Subí el brazo hacia el costado hasta la altura del hombro.', 'Bajá lento sin dejar que el cable te tire.'], ['Girar el torso para ayudarte.', 'Subir el hombro hacia la oreja.']],
+  'Elevaciones frontales': ['Mancuernas', ['De pie, mancuernas adelante de los muslos.', 'Subí un brazo o los dos hacia adelante hasta la altura de los hombros.', 'Bajá controlado.'], ['Balancear el cuerpo.', 'Subir más arriba de la cabeza.']],
+  'Pájaros (deltoide posterior)': ['Mancuernas', ['Inclinado adelante con la espalda recta (o boca abajo en un banco inclinado).', 'Abrí los brazos hacia los costados con los codos levemente flexionados.', 'Bajá lento.'], ['Juntar los omóplatos al máximo: se lleva el trabajo la espalda.', 'Usar envión.']],
+  'Face pull': ['Polea', ['Polea a la altura de la cara con soga, agarre con los pulgares hacia atrás.', 'Tirá hacia la frente separando las manos, codos altos.', 'Terminá con los brazos como haciendo "doble bíceps" y volvé lento.'], ['Codos bajos: se convierte en un remo.', 'Tirar con el cuerpo hacia atrás.']],
+  'Extensión de tríceps en polea': ['Polea', ['Frente a la polea alta, codos pegados al cuerpo.', 'Estirá los brazos hacia abajo sin mover los codos.', 'Volvé hasta que el antebrazo quede casi horizontal.'], ['Mover los codos hacia adelante y atrás.', 'Inclinar el cuerpo encima para empujar con el peso.']],
+  'Extensión de tríceps sobre la cabeza': ['Polea', ['De espaldas a la polea (o con mancuerna), brazos arriba con los codos apuntando al frente.', 'Estirá los brazos hacia arriba y adelante.', 'Bajá hasta sentir estiramiento en el tríceps.'], ['Abrir mucho los codos.', 'Arquear la zona lumbar.']],
+  'Press francés': ['Barra', ['Acostado, barra arriba con los brazos estirados.', 'Bajá la barra hacia la frente doblando solo los codos.', 'Estirá de nuevo sin mover los hombros.'], ['Abrir los codos.', 'Bajar sin control cerca de la cara.']],
+  'Press cerrado': ['Barra', ['Como un press de banca con el agarre a la altura de los hombros.', 'Bajá la barra al pecho bajo con los codos pegados.', 'Empujá estirando los brazos.'], ['Agarre demasiado cerrado: molesta las muñecas.', 'Abrir los codos.']],
+  'Patada de tríceps': ['Mancuernas', ['Inclinado con la espalda recta, brazo pegado al cuerpo y codo a 90°.', 'Estirá el brazo hacia atrás.', 'Volvé lento sin mover el brazo.'], ['Bajar el codo durante el movimiento.', 'Balancear la mancuerna.']],
+  'Dominadas': ['Peso corporal', ['Colgado con agarre algo más ancho que los hombros, hombros activos (alejados de las orejas).', 'Tirá llevando el pecho hacia la barra, pensando en bajar los codos.', 'Bajá hasta estirar casi del todo los brazos.'], ['Medio recorrido.', 'Balancearse con las piernas.']],
+  'Jalón al pecho': ['Polea', ['Sentado con los muslos trabados, agarre algo más ancho que los hombros.', 'Llevá la barra hacia la parte alta del pecho bajando los codos.', 'Subí controlado hasta estirar los brazos.'], ['Tirarse muy hacia atrás.', 'Llevar la barra detrás de la nuca.']],
+  'Jalón agarre cerrado': ['Polea', ['Sentado con el agarre en V o neutro cerrado.', 'Tirá hacia el pecho bajando los codos pegados al cuerpo.', 'Subí controlado hasta estirar los brazos.'], ['Tirar solo con los brazos.', 'Balancearse.']],
+  'Remo con barra': ['Barra', ['Inclinado a unos 45° con la espalda recta y las rodillas apenas flexionadas.', 'Llevá la barra hacia el ombligo juntando los omóplatos.', 'Bajá controlado sin perder la postura.'], ['Redondear la espalda.', 'Levantar el torso para ayudarte.']],
+  'Remo con mancuerna': ['Mancuernas', ['Una mano y una rodilla apoyadas en el banco, espalda recta.', 'Llevá la mancuerna hacia la cadera.', 'Bajá hasta estirar el brazo.'], ['Girar el torso para subir más.', 'Tirar hacia el hombro en vez de la cadera.']],
+  'Remo en polea baja': ['Polea', ['Sentado con el torso erguido y las rodillas levemente flexionadas.', 'Llevá el agarre hacia el abdomen juntando los omóplatos.', 'Volvé estirando los brazos y dejando que los hombros se adelanten un poco.'], ['Balancearse hacia atrás.', 'Encoger los hombros.']],
+  'Remo en máquina': ['Máquina', ['Pecho apoyado en el respaldo y asiento regulado.', 'Tirá de las manijas llevando los codos hacia atrás.', 'Volvé lento.'], ['Despegar el pecho del apoyo.', 'Recorrido corto.']],
+  'Remo en T': ['Barra', ['Parado sobre la barra (o en la máquina) con la espalda recta e inclinada.', 'Tirá el agarre hacia el abdomen juntando los omóplatos.', 'Bajá controlado.'], ['Redondear la espalda.', 'Usar las piernas para subir.']],
+  'Pullover en polea': ['Polea', ['Frente a la polea alta, brazos estirados y torso apenas inclinado.', 'Bajá la barra en arco hasta los muslos con los brazos casi rectos.', 'Volvé lento hasta sentir estiramiento en los dorsales.'], ['Doblar los codos: se convierte en tríceps.', 'Mover el torso.']],
+  'Peso muerto': ['Barra', ['Barra sobre la mitad del pie, agarrá con la espalda recta y el pecho alto.', 'Empujá el piso con las piernas y extendé la cadera manteniendo la barra pegada al cuerpo.', 'Bajá con el mismo recorrido, cadera hacia atrás.'], ['Redondear la espalda.', 'Barra lejos del cuerpo.', 'Tirar con los brazos.']],
+  'Encogimientos': ['Mancuernas', ['De pie con mancuernas o barra a los costados.', 'Subí los hombros hacia las orejas.', 'Pausa arriba y bajá lento.'], ['Girar los hombros en círculos.', 'Doblar los codos.']],
+  'Curl con barra': ['Barra', ['De pie, agarre al ancho de los hombros, codos pegados.', 'Subí la barra doblando solo los codos.', 'Bajá lento hasta estirar los brazos.'], ['Balancear el cuerpo.', 'Adelantar los codos.']],
+  'Curl con mancuernas': ['Mancuernas', ['De pie o sentado, palmas hacia adelante.', 'Subí doblando el codo sin moverlo.', 'Bajá lento.'], ['Envión con la cadera.', 'Bajar sin control.']],
+  'Curl martillo': ['Mancuernas', ['Palmas mirándose entre sí.', 'Subí doblando los codos sin girar la muñeca.', 'Bajá lento.'], ['Balancear.', 'Codos que se van hacia adelante.']],
+  'Curl martillo en banco Scott': ['Mancuernas', ['Brazo apoyado en el banco Scott, agarre neutro (palma hacia adentro).', 'Subí doblando el codo.', 'Bajá hasta casi estirar el brazo, controlado.'], ['Bajar de golpe al final: estresa el codo.', 'Despegar el brazo del apoyo.']],
+  'Curl en banco inclinado': ['Mancuernas', ['Sentado en banco a unos 45°, brazos colgando detrás del cuerpo.', 'Subí sin adelantar los codos.', 'Bajá hasta estirar del todo.'], ['Adelantar los hombros.', 'Peso excesivo.']],
+  'Curl en polea': ['Polea', ['Frente a la polea baja, codos pegados.', 'Subí doblando los codos.', 'Bajá lento.'], ['Inclinarse hacia atrás.', 'Mover los codos.']],
+  'Curl predicador': ['Barra', ['Brazos apoyados en el banco Scott.', 'Subí doblando los codos.', 'Bajá controlado hasta casi estirar.'], ['Rebotar abajo.', 'Levantar los codos del apoyo.']],
+  'Curl bayesian en polea': ['Polea', ['De espaldas a la polea baja, un paso adelante, brazo estirado detrás del cuerpo.', 'Subí doblando el codo sin moverlo hacia adelante.', 'Bajá lento hasta sentir el estiramiento del bíceps.'], ['Adelantar el codo al subir.', 'Recorrido corto atrás: el estiramiento es la gracia del ejercicio.']],
+  'Curl de muñeca': ['Mancuernas', ['Antebrazos apoyados en los muslos o un banco, muñecas por fuera.', 'Subí la mancuerna flexionando solo la muñeca.', 'Bajá lento.'], ['Mover los antebrazos.', 'Peso excesivo.']],
+  'Sentadilla con barra': ['Barra', ['Barra sobre los trapecios, pies al ancho de hombros, puntas algo abiertas.', 'Bajá llevando la cadera atrás y abajo, rodillas en la dirección de los pies.', 'Subí empujando el piso con el pecho alto.'], ['Rodillas que se van hacia adentro.', 'Levantar los talones.', 'Redondear la espalda abajo.']],
+  'Sentadilla frontal': ['Barra', ['Barra apoyada adelante sobre los hombros, codos altos.', 'Bajá con el torso bien erguido.', 'Subí manteniendo los codos arriba.'], ['Codos que caen.', 'Inclinarse adelante.']],
+  'Prensa de piernas': ['Máquina', ['Espalda y cola bien apoyadas, pies al ancho de hombros en el medio de la plataforma.', 'Bajá hasta donde puedas sin despegar la cola.', 'Empujá sin bloquear las rodillas.'], ['Despegar la cola abajo.', 'Bloquear las rodillas arriba.']],
+  'Sentadilla hack': ['Máquina', ['Espalda apoyada en el respaldo, pies en el medio de la plataforma.', 'Bajá profundo con las rodillas hacia adelante.', 'Subí empujando con toda la planta.'], ['Recorrido corto.', 'Levantar los talones.']],
+  'Extensión de cuádriceps': ['Máquina', ['Rodilla alineada con el eje de la máquina, espalda apoyada.', 'Estirá las piernas apretando el cuádriceps arriba.', 'Bajá lento.'], ['Patear con envión.', 'Levantar la cola del asiento.']],
+  'Camilla de cuádriceps': ['Máquina', ['Rodilla alineada con el eje de la máquina, espalda apoyada.', 'Estirá las piernas apretando el cuádriceps arriba.', 'Bajá lento.'], ['Patear con envión.', 'Levantar la cola del asiento.']],
+  'Zancadas': ['Mancuernas', ['Dá un paso largo hacia adelante con el torso erguido.', 'Bajá hasta que la rodilla de atrás casi toque el piso.', 'Empujá con la pierna de adelante para volver.'], ['Rodilla de adelante hacia adentro.', 'Paso muy corto.']],
+  'Estocadas en Smith': ['Smith', ['Barra en la espalda, un pie adelante y otro atrás.', 'Bajá vertical hasta que la rodilla de atrás casi toque el piso.', 'Subí empujando con el talón de adelante.'], ['Pies en la misma línea: perdés equilibrio.', 'Empujar con la pierna de atrás.']],
+  'Sentadilla búlgara': ['Mancuernas', ['Pie de atrás apoyado en un banco, el de adelante a un paso largo.', 'Bajá vertical hasta que el muslo de adelante quede paralelo al piso.', 'Subí empujando con el pie de adelante.'], ['Pie de adelante muy cerca del banco.', 'Inclinarse de costado.']],
+  'Sentadilla goblet': ['Mancuernas', ['Mancuerna agarrada contra el pecho.', 'Bajá profundo con el torso erguido y los codos entre las rodillas.', 'Subí empujando el piso.'], ['Inclinarse hacia adelante.', 'Rodillas hacia adentro.']],
+  'Peso muerto rumano': ['Barra', ['De pie con la barra, rodillas apenas flexionadas.', 'Llevá la cadera hacia atrás bajando la barra pegada a las piernas hasta sentir estiramiento en el femoral.', 'Volvé empujando la cadera hacia adelante.'], ['Redondear la espalda.', 'Doblar mucho las rodillas: pasa a ser una sentadilla.', 'Barra lejos de las piernas.']],
+  'Buenos días': ['Barra', ['Barra en la espalda, rodillas apenas flexionadas.', 'Inclinate llevando la cadera atrás con la espalda recta.', 'Volvé apretando glúteos.'], ['Redondear la espalda.', 'Usar mucho peso.']],
+  'Curl femoral acostado': ['Máquina', ['Boca abajo, rodillas justo fuera del banco y rodillo sobre los tobillos.', 'Doblá las rodillas llevando los talones hacia la cola.', 'Bajá lento.'], ['Levantar la cadera.', 'Bajar de golpe.']],
+  'Curl femoral sentado': ['Máquina', ['Rodillas alineadas con el eje, traba de muslos ajustada.', 'Doblá las rodillas llevando los talones hacia abajo y atrás.', 'Volvé lento hasta casi estirar.'], ['Traba floja: te despegás del asiento.', 'Recorrido corto.']],
+  'Hip thrust': ['Barra', ['Espalda alta apoyada en un banco, barra sobre la cadera, pies firmes.', 'Subí la cadera apretando glúteos hasta quedar en línea hombros-rodillas.', 'Bajá controlado.'], ['Arquear la zona lumbar arriba en vez de extender la cadera.', 'Pies muy lejos: trabaja más femoral.']],
+  'Patada de glúteo en polea': ['Polea', ['Tobillera en la polea baja, torso apenas inclinado y agarrado de la máquina.', 'Llevá la pierna hacia atrás apretando el glúteo.', 'Volvé lento.'], ['Arquear la espalda.', 'Balancear la pierna.']],
+  'Abducción en máquina': ['Máquina', ['Sentado con la espalda apoyada, almohadillas por fuera de las rodillas.', 'Abrí las piernas hacia afuera.', 'Volvé lento sin que las placas choquen.'], ['Envión.', 'Recorrido corto.']],
+  'Aducción en máquina': ['Máquina', ['Sentado, almohadillas por dentro de las rodillas.', 'Cerrá las piernas.', 'Abrí lento hasta sentir estiramiento.'], ['Abrir demasiado de golpe.', 'Envión.']],
+  'Elevación de talones de pie': ['Máquina', ['Puntas de los pies en el borde, talones en el aire.', 'Subí lo más alto posible.', 'Bajá hasta estirar bien el gemelo, con una pausa abajo.'], ['Rebotar.', 'Recorrido corto.']],
+  'Elevación de talones sentado': ['Máquina', ['Sentado con las almohadillas sobre los muslos, puntas en el borde.', 'Subí los talones lo más alto posible.', 'Bajá hasta estirar con pausa.'], ['Rebotar abajo.', 'Recorrido corto.']],
+  'Elevación de talones unilateral con mancuerna': ['Mancuernas', ['Parado en un escalón con un pie, mancuerna del mismo lado, agarrado de algo para el equilibrio.', 'Subí lo más alto posible.', 'Bajá hasta estirar bien con una pausa.'], ['Rebotar.', 'Doblar la rodilla para ayudarte.']],
+  'Gemelos en prensa': ['Máquina', ['Puntas de los pies en el borde de la plataforma, piernas casi estiradas.', 'Empujá con las puntas.', 'Volvé estirando el gemelo.'], ['Doblar las rodillas.', 'Rebotar.']],
+  'Plancha': ['Peso corporal', ['Antebrazos en el piso, cuerpo recto de la cabeza a los talones.', 'Apretá abdomen y glúteos.', 'Mantené la posición respirando normal.'], ['Cadera caída.', 'Cola muy arriba.']],
+  'Crunch en polea': ['Polea', ['De rodillas frente a la polea alta, soga a los costados de la cabeza.', 'Enrollá el torso llevando el pecho hacia la pelvis.', 'Volvé lento.'], ['Tirar con los brazos.', 'Mover la cadera en vez de doblar la columna.']],
+  'Elevación de piernas colgado': ['Peso corporal', ['Colgado de la barra, hombros activos.', 'Subí las piernas enrollando la pelvis hacia arriba.', 'Bajá lento sin balancearte.'], ['Balancearse.', 'Subir solo con la cadera sin enrollar.']],
+  'Rueda abdominal': ['Peso corporal', ['De rodillas con la rueda adelante.', 'Rodá hacia adelante con el abdomen firme hasta donde controles.', 'Volvé tirando con el abdomen.'], ['Arquear la zona lumbar.', 'Ir más lejos de lo que podés controlar.']],
+}; const o = {}; Object.keys(I).forEach(k => o[norm(k)] = I[k]); return o; })();
+const EQUIP = ['Barra', 'Mancuernas', 'Polea', 'Máquina', 'Smith', 'Peso corporal', 'Otro'];
+function exInfo(x) { const i = x ? INFO[norm(x.name)] : null; return { eq: (x && x.eq) || (i ? i[0] : 'Otro'), how: i ? i[1] : [], err: i ? i[2] : [] }; }
+const mainMus = id => { const m = exMus(id); return Object.keys(m).find(k => m[k] >= 1) || Object.keys(m)[0] || 'Otro'; };
+function recentEx(n = 8) { const out = []; for (let i = S.sessions.length - 1; i >= 0 && out.length < n; i--) S.sessions[i].exercises.forEach(e => { if (out.length < n && !out.includes(e.exerciseId) && exById(e.exerciseId)) out.push(e.exerciseId); }); return out; }
+function techHtml(x) {
+  const I = exInfo(x); if (!I.how.length) return '';
+  return `<details class="card tech"><summary><b>Cómo hacerlo</b><span class="mu sm">${esc(I.eq)}</span></summary>
+    <ol>${I.how.map(t => `<li>${esc(t)}</li>`).join('')}</ol>${I.err.length ? `<div class="kicker" style="font-size:11px;margin-top:12px">Errores frecuentes</div><ul>${I.err.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</details>`;
+}
+function musChips(id) { const m = exMus(id), k = Object.keys(m).sort((a, b) => m[b] - m[a]);
+  return k.map(x => `<span class="mchip ${m[x] >= 1 ? 'on' : ''}">${esc(x)}${m[x] < 1 ? ' · ½' : ''}</span>`).join(''); }
 /* ---------- Músculos: series semanales ---------- */
 // Músculos que analiza la app, con el rango aproximado de series semanales para ganar músculo
 const AM = [
@@ -1083,6 +1181,7 @@ const MMAP = (() => {
 const MFB = { Hombro: { 'Deltoide anterior': .5, 'Deltoide lateral': .5 } };
 function exMus(exId, name, muscle) {
   const x = exById(exId), n = norm((x && x.name) || name || '');
+  if (x && x.mm && Object.keys(x.mm).length) return x.mm;
   if (MMAP[n]) return MMAP[n];
   const m = (x && x.muscle) || muscle || 'Otro';
   return MFB[m] || (MRANGE(m) !== undefined && AM.some(a => a[0] === m) ? { [m]: 1 } : {});
@@ -1736,13 +1835,14 @@ function vProgress() {
 function vExercise() {
   const id = R.id, ex = exById(id), ser = exSeries(id), u = unit(), step = S.settings.step;
   const name = ex ? ex.name : 'Ejercicio', rx = rxFor(id), k = coach(id, rx);
-  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div>
-    <div class="kicker">${esc(ex ? ex.muscle : '')}</div><h1 style="margin-top:6px">${esc(name)}</h1>`;
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button><span class="sp"></span>${ex ? `<button class="sm ghost star ${ex.fav ? 'on' : ''}" data-a="exFav" data-id="${ex.id}" aria-label="Favorito">${ex.fav ? '★' : '☆'}</button><button class="sm" data-a="exEdit" data-id="${ex.id}">Editar</button>` : ''}</div>
+    <div class="kicker">${esc(ex ? exInfo(ex).eq : '')}</div><h1 style="margin-top:6px">${esc(name)}</h1>
+    <div class="mchips" style="margin:-4px 0 16px">${musChips(id)}</div>`;
   // Qué hacer la próxima vez
   h += `<div class="card coach"><div class="row" style="align-items:flex-start"><div class="sp"><div class="kicker" style="font-size:11px">Próxima vez${rx ? ' · ' + esc(rx.label) : ''}</div>
     <div class="bigstat" style="font-size:42px;margin-top:6px">${k.w ? fmtNum(k.w) + `<span class="mu" style="font-size:20px;font-weight:600"> ${u}</span>` : '—'}</div>
     ${rx ? `<div class="mu sm" style="margin-top:4px">${rx.sets} series × ${repsTxt(rx.repMin, rx.repMax)} reps${rx.rir != null ? ` · dejando ${rx.rir} en reserva` : ''}</div>` : ''}</div>
-    <span class="cbadge ${k.kind}">${CB[k.kind]}</span></div><p class="sm" style="margin:14px 0 0;line-height:1.5">${esc(k.msg)}</p></div>`;
+    <span class="cbadge ${k.kind}">${CB[k.kind]}</span></div><p class="sm" style="margin:14px 0 0;line-height:1.5">${esc(k.msg)}</p></div>${techHtml(ex)}`;
   const alts = ((ex && ex.alts) || []).map(exById).filter(Boolean);
   if (alts.length) h += `<div class="row" style="gap:8px;flex-wrap:wrap;margin:-4px 0 16px"><span class="mu sm">Alternativas:</span>${alts.map(x => `<button class="chip" data-a="openEx" data-id="${x.id}">${esc(x.name)}</button>`).join('')}</div>`;
   if (!ser.length) return h + `<div class="card mu">Todavía no registraste este ejercicio. Después del primer entrenamiento vas a ver acá tu máximo estimado y su evolución.</div>`;
@@ -2245,20 +2345,32 @@ function vProfile() {
   return h;
 }
 let exQ = '';
+let exMF = '', exEF = '', eeMM = null;
+function eeChips() { return AM.map(([m]) => { const w = (eeMM || {})[m] || 0; return `<button class="chip ${w >= 1 ? 'on' : w ? 'half' : ''}" data-a="eeMus" data-k="${esc(m)}">${esc(m)}${w && w < 1 ? ' · ½' : ''}</button>`; }).join(''); }
 function exListHtml() {
-  const q = norm(exQ), used = {};
-  S.routines.forEach(r => r.items.forEach(it => used[it.exerciseId] = (used[it.exerciseId] || 0) + 1));
-  const list = S.exercises.filter(e => !q || norm(e.name + ' ' + e.muscle).includes(q));
+  const q = norm(exQ), used = {}, rec = recentEx(12);
+  S.routines.forEach(r => { if (!r.archived) r.items.forEach(it => used[it.exerciseId] = (used[it.exerciseId] || 0) + 1); });
+  let list = S.exercises.filter(e => !q || norm(e.name + ' ' + e.muscle + ' ' + Object.keys(exMus(e.id)).join(' ')).includes(q));
+  if (exMF === 'fav') list = list.filter(e => e.fav);
+  else if (exMF === 'rec') list = rec.map(exById).filter(e => e && list.includes(e));
+  else if (exMF) list = list.filter(e => (exMus(e.id)[exMF] || 0) > 0);
+  if (exEF) list = list.filter(e => exInfo(e).eq === exEF);
   if (!list.length) return `<p class="mu">No hay resultados.</p>`;
-  const groups = {};
-  list.forEach(e => (groups[e.muscle || 'Otro'] = groups[e.muscle || 'Otro'] || []).push(e));
-  return Object.keys(groups).sort((a, b) => MUSCLES.indexOf(a) - MUSCLES.indexOf(b)).map(g => `<div class="grp">${esc(g)}</div><div class="card" style="padding:0 18px">` +
-    groups[g].sort((a, b) => a.name.localeCompare(b.name, 'es')).map(e => `<div class="exrow" data-a="exEdit" data-id="${e.id}"><div class="sp"><div style="font-weight:600">${esc(e.name)}</div>
-      <div class="mu sm">${[e.unilateral ? 'Unilateral' : '', e.custom ? 'Creado por vos' : '', used[e.id] ? `En ${used[e.id]} ${used[e.id] === 1 ? 'rutina' : 'rutinas'}` : ''].filter(Boolean).join(' · ') || 'Biblioteca'}</div></div><span class="mu">›</span></div>`).join('') + `</div>`).join('');
+  const rowH = e => { const m = exMus(e.id), sec = Object.keys(m).filter(k => m[k] < 1);
+    return `<div class="exrow"><button class="star ${e.fav ? 'on' : ''}" data-a="exFav" data-id="${e.id}" aria-label="Favorito">${e.fav ? '★' : '☆'}</button><div class="sp clickable" data-a="openEx" data-id="${e.id}"><div style="font-weight:600">${esc(e.name)}</div>
+      <div class="mu sm">${[exInfo(e).eq, exMF && exMF !== 'fav' && exMF !== 'rec' && (m[exMF] || 0) < 1 ? 'secundario' : sec.length ? 'también ' + sec.join(', ').toLowerCase() : '', e.custom ? 'creado por vos' : '', used[e.id] ? `en ${used[e.id]} ${used[e.id] === 1 ? 'día' : 'días'}` : ''].filter(Boolean).join(' · ')}</div></div><span class="mu">›</span></div>`; };
+  if (exMF === 'rec') return `<div class="card" style="padding:0 18px">${list.map(rowH).join('')}</div>`;
+  const groups = {}; list.forEach(e => (groups[mainMus(e.id)] = groups[mainMus(e.id)] || []).push(e));
+  const ord = AM.map(a => a[0]);
+  return Object.keys(groups).sort((a, b) => (b === exMF) - (a === exMF) || (ord.indexOf(a) + 1 || 99) - (ord.indexOf(b) + 1 || 99)).map(g => `<div class="grp">${esc(g)}</div><div class="card" style="padding:0 18px">` +
+    groups[g].sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0) || a.name.localeCompare(b.name, 'es')).map(rowH).join('') + `</div>`).join('');
 }
 function vExercises() {
+  const nf = S.exercises.filter(e => e.fav).length;
   return `<div class="head"><button class="ghost" data-a="back">‹ Volver</button><span class="sp"></span><button class="sm pri" data-a="exNew">+ Nuevo</button></div>
-    <h1 style="margin-top:0">Ejercicios</h1><input data-f="exq" value="${esc(exQ)}" placeholder="Buscar ejercicio…" autocomplete="off" style="margin-bottom:6px">
+    <h1 style="margin-top:0">Ejercicios</h1><input data-f="exq" value="${esc(exQ)}" placeholder="Buscar ejercicio o músculo…" autocomplete="off" style="margin-bottom:10px">
+    <div class="chips hs">${[['', 'Todos'], ['fav', `★ Favoritos${nf ? ' · ' + nf : ''}`], ['rec', 'Recientes'], ...AM.map(a => [a[0], a[0]])].map(([k, l]) => `<button class="chip ${exMF === k ? 'on' : ''}" data-a="exMF" data-k="${esc(k)}">${esc(l)}</button>`).join('')}</div>
+    <div class="chips hs" style="margin-top:6px">${['', ...EQUIP].map(k => `<button class="chip sm2 ${exEF === k ? 'on' : ''}" data-a="exEF" data-k="${esc(k)}">${k || 'Todo el equipo'}</button>`).join('')}</div>
     <div id="exlist">${exListHtml()}</div>`;
 }
 function renameEverywhere(id, e) {
@@ -2426,9 +2538,14 @@ function pickerList() {
   const q = norm(pickQ);
   const list = S.exercises.filter(e => !q || norm(e.name + ' ' + e.muscle).includes(q));
   if (!list.length) return `<p class="mu">No hay resultados. Podés crearlo abajo.</p>`;
+  const btn = e => `<button class="pick" data-a="pickEx" data-id="${e.id}">${e.fav ? '★ ' : ''}${esc(e.name)}${e.custom ? ' <span class="mu sm">· tuyo</span>' : ''}</button>`;
+  let top = '';
+  if (!q) { const fav = S.exercises.filter(e => e.fav), rec = recentEx(6).map(exById).filter(e => e && !e.fav);
+    if (fav.length) top += `<div class="grp">★ Favoritos</div>${fav.map(btn).join('')}`;
+    if (rec.length) top += `<div class="grp">Recientes</div>${rec.map(btn).join('')}`; }
   const groups = {};
   list.forEach(e => (groups[e.muscle || 'Otro'] = groups[e.muscle || 'Otro'] || []).push(e));
-  return Object.keys(groups).sort((a, b) => MUSCLES.indexOf(a) - MUSCLES.indexOf(b)).map(g =>
+  return top + Object.keys(groups).sort((a, b) => MUSCLES.indexOf(a) - MUSCLES.indexOf(b)).map(g =>
     `<div class="grp">${esc(g)}</div>` + groups[g].sort((a, b) => a.name.localeCompare(b.name, 'es')).map(e =>
       `<button class="pick" data-a="pickEx" data-id="${e.id}">${esc(e.name)}${e.custom ? ' <span class="mu sm">· tuyo</span>' : ''}</button>`).join('')).join('');
 }
@@ -2520,11 +2637,14 @@ const A = {
   delBody: d => { S.body = S.body.filter(b => b.id !== d.id); S.deleted.push(d.id); closeModal(); save(); render(); },
   exNew: () => { pickQ = ''; pickCb = () => { render(); toast('Ejercicio creado'); }; openModal(newExHtml()); },
   exEdit: d => {
-    const e = exById(d.id); if (!e) return;
+    const e = exById(d.id); if (!e) return; eeMM = { ...exMus(e.id) };
     const inR = S.routines.filter(r => r.items.some(it => it.exerciseId === e.id)).map(r => r.name);
     openModal(`<div class="t" style="font-size:19px">Editar ejercicio</div>
       <label class="f"><span>Nombre</span><input id="ee_n" value="${esc(e.name)}"></label>
       <label class="f"><span>Músculo principal</span><select id="ee_m">${MUSCLES.map(m => `<option ${m === e.muscle ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
+      <label class="f"><span>Equipamiento</span><select id="ee_e">${EQUIP.map(q => `<option ${q === exInfo(e).eq ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
+      <div class="f"><span>Músculos que trabaja (para contar series)</span><div class="chips" id="ee_mm">${eeChips(e)}</div>
+      <div class="mu sm" style="margin-top:6px">Tocá para cambiar: principal (cuenta 1) → secundario (½) → no trabaja.</div></div>
       <label class="row f" style="gap:10px"><input type="checkbox" id="ee_u" style="width:auto" ${e.unilateral ? 'checked' : ''}> <span style="margin:0;font-size:15px;color:var(--tx)">Unilateral (se registra por lado)</span></label>
       ${inR.length ? `<p class="mu sm">En: ${esc(inR.join(', '))}</p>` : ''}
       <button class="big pri" data-a="exSave" data-id="${e.id}">Guardar</button>
@@ -2532,10 +2652,16 @@ const A = {
       ${inR.length ? '' : `<button class="big ghost danger" data-a="exDel" data-id="${e.id}">Eliminar ejercicio</button>`}
       <button class="big ghost" data-a="closeModal">Cancelar</button>`);
   },
+  eeMus: d => { const w = eeMM[d.k] || 0, nw = w >= 1 ? .5 : w ? 0 : 1; if (nw) eeMM[d.k] = nw; else delete eeMM[d.k]; $('#ee_mm').innerHTML = eeChips(); },
+  exFav: d => { const e = exById(d.id); if (!e) return; e.fav = !e.fav; e.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(e.fav ? 'Agregado a favoritos ★' : 'Quitado de favoritos'); },
+  exMF: d => { exMF = d.k; const l = $('#exlist'); render(); },
+  exEF: d => { exEF = d.k; render(); },
   exSave: d => {
     const e = exById(d.id), n = $('#ee_n').value.trim(); if (!n) { toast('Escribí un nombre'); return; }
     if (S.exercises.some(x => x.id !== e.id && norm(x.name) === norm(n))) { toast('Ya existe un ejercicio con ese nombre'); return; }
     e.name = n; e.muscle = $('#ee_m').value; e.unilateral = $('#ee_u').checked; e.u = Date.now();
+    const eq = $('#ee_e').value, I = INFO[norm(n)]; if (I && I[0] === eq) delete e.eq; else e.eq = eq;
+    if (eeMM && JSON.stringify(eeMM) !== JSON.stringify(MMAP[norm(n)] || null)) e.mm = eeMM; else if (eeMM) delete e.mm;
     renameEverywhere(e.id, e); closeModal(); save(); render(); toast('Ejercicio actualizado');
   },
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
@@ -2936,7 +3062,7 @@ const A = {
       ${ser.length ? `<div class="mu sm" style="margin-top:8px">Fuerza estimada (1RM): <b style="color:var(--tx)">${Math.round(ser[ser.length - 1].e1)} ${unit()}</b></div>${lineChart(ser.slice(-12).map(x => ({ x: x.date, y: x.e1 })), unit())}
       <div style="margin-top:8px">${[...ser].reverse().slice(0, 5).map(x => `<div class="drow"><span class="sp">${fmtShort(x.date)}</span><span class="mu sm">${x.sets.map(s => fmtNum(s.w) + '×' + s.r).join(' · ')}</span></div>`).join('')}</div>`
       : `<p class="mu">Es la primera vez que hacés este ejercicio. Después de hoy vas a ver acá tu evolución.</p>`}
-      <button class="big" data-a="closeModal">Cerrar</button>`);
+      ${techHtml(exById(e.exerciseId))}<button class="big" data-a="closeModal">Cerrar</button>`);
   },
   chooseEx: () => {
     const a = S.active;
