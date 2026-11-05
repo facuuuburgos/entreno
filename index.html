@@ -546,6 +546,14 @@ html,body,*{scrollbar-width:none}
 .crow .cd.up{color:var(--ac)}.crow .cd.down{color:var(--dn)}
 .crow.ch{font-size:12px;color:var(--mu);padding:6px 0}.crow.ch b{font-size:12px}
 .rbtns{flex-wrap:wrap}
+.rec .recact{background:var(--s2);border-radius:12px;padding:10px 12px;line-height:1.45}
+.rec a{color:var(--mu);text-decoration:underline;text-underline-offset:3px}
+.covm{padding:12px 0;border-bottom:1px solid var(--ln)}.covm:last-child{border-bottom:none}
+.covr{display:flex;align-items:center;gap:8px;font-size:13.5px;margin-top:7px}
+.covr i{font-style:normal;width:20px;height:20px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0}
+.covr.ok i{background:var(--acd);color:var(--ac)}.covr.no i{background:rgba(255,122,182,.14);color:#ff7ab6}.covr.opt i{background:var(--s2);color:var(--mu)}
+.covr .mu{font-size:12.5px;text-align:right;max-width:45%}
+b.warn{color:#ffb347}
 </style>
 </head>
 <body>
@@ -566,7 +574,7 @@ html,body,*{scrollbar-width:none}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '7.9';
+const KEY = 'entreno.v1', VERSION = '8.0';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1331,6 +1339,7 @@ function vMuscles() {
   });
   h += `<p class="mu sm">Series hechas${cur && Object.keys(P).length ? ' / las que pide tu plan (rayita blanca)' : ''}. La zona marcada es el rango recomendado por semana. Cada serie cuenta entera para el músculo principal del ejercicio y la mitad para los secundarios. Tocá un músculo para ver qué ejercicios suman.</p>`;
   const T = musTips(cur ? P : {}, W);
+  if (cur && planDays().length) h += `<div class="card clickable" data-a="openAnalysis"><div class="row">${ico('target')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div><div class="mu sm">Qué cambiar en tus días para equilibrar la semana</div></div><span class="mu">›</span></div></div>`;
   if (T.t.length) h += `<h2>Sugerencias${T.isPlan ? ' para tu plan' : ''}</h2><div class="card sm" style="line-height:1.5">${T.t.slice(0, 6).map(x => `<p style="margin:6px 0">${x}</p>`).join('')}</div>`;
   else h += `<div class="card sm">✓ ${T.isPlan ? 'Tu plan' : 'Esta semana'} tiene un volumen equilibrado en todos los músculos.</div>`;
   const D = {}; for (let k = 0; k < 4; k++) { const w4 = musWeek(addDays(weekStart(), -7 * k)); Object.keys(w4).forEach(m => D[m] = (D[m] || 0) + w4[m].sets); }
@@ -1412,6 +1421,182 @@ const ICP = {
   calx: '<rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4M10 13.5l4 4M14 13.5l-4 4"/>',
 };
 const ico = (n, tone = '') => `<span class="ic ${tone}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICP[n]}</svg></span>`;
+/* ---------- Análisis del plan ---------- */
+// Patrón de movimiento de cada ejercicio (qué función cumple para el músculo)
+const PATN = { squat: 'Multiarticular de piernas', lunge: 'Unilateral de piernas (zancada, búlgara)', kneeExt: 'Extensión de rodilla', kneeFlex: 'Flexión de rodilla (curl)', hinge: 'Extensión de cadera (bisagra)', hipExt: 'Extensión de cadera (empuje)',
+  abd: 'Abducción de cadera', add: 'Aducción de cadera', hPush: 'Empuje horizontal (press)', incPush: 'Press inclinado', vPush: 'Empuje vertical (press de hombro)', fly: 'Aperturas',
+  hPull: 'Tracción horizontal (remo)', vPull: 'Tracción vertical (jalón, dominadas)', pullover: 'Pullover', lat: 'Elevaciones laterales', rear: 'Deltoide posterior directo', front: 'Elevaciones frontales',
+  ohTri: 'Tríceps por encima de la cabeza', tri: 'Extensión de tríceps', curl: 'Curl de bíceps', curlLong: 'Curl con el brazo atrás (estirado)', curlShort: 'Curl predicador (Scott)',
+  calfStr: 'Gemelos con rodilla estirada', calfBent: 'Gemelos sentado', abs: 'Abdominales', shrug: 'Encogimientos', wrist: 'Antebrazo', other: 'Otro' };
+const PAT = (() => { const P = {
+  'Press de banca con barra': 'hPush', 'Press de banca con mancuernas': 'hPush', 'Press en máquina': 'hPush', 'Flexiones': 'hPush', 'Fondos en paralelas': 'hPush', 'Press cerrado': 'hPush',
+  'Press inclinado con barra': 'incPush', 'Press inclinado con mancuernas': 'incPush', 'Aperturas con mancuernas': 'fly', 'Cruces en polea': 'fly', 'Pec deck': 'fly',
+  'Press militar con barra': 'vPush', 'Press de hombro con mancuernas': 'vPush', 'Press de hombro en máquina': 'vPush',
+  'Elevaciones laterales': 'lat', 'Elevaciones laterales en polea': 'lat', 'Elevaciones frontales': 'front', 'Pájaros (deltoide posterior)': 'rear', 'Face pull': 'rear',
+  'Extensión de tríceps en polea': 'tri', 'Patada de tríceps': 'tri', 'Press francés': 'tri', 'Extensión de tríceps sobre la cabeza': 'ohTri',
+  'Dominadas': 'vPull', 'Jalón al pecho': 'vPull', 'Jalón agarre cerrado': 'vPull', 'Pullover en polea': 'pullover',
+  'Remo con barra': 'hPull', 'Remo con mancuerna': 'hPull', 'Remo en polea baja': 'hPull', 'Remo en máquina': 'hPull', 'Remo en T': 'hPull',
+  'Peso muerto': 'hinge', 'Peso muerto rumano': 'hinge', 'Buenos días': 'hinge', 'Encogimientos': 'shrug',
+  'Curl con barra': 'curl', 'Curl con mancuernas': 'curl', 'Curl martillo': 'curl', 'Curl en polea': 'curl', 'Curl en banco inclinado': 'curlLong', 'Curl bayesian en polea': 'curlLong',
+  'Curl predicador': 'curlShort', 'Curl martillo en banco Scott': 'curlShort', 'Curl de muñeca': 'wrist',
+  'Sentadilla con barra': 'squat', 'Sentadilla frontal': 'squat', 'Prensa de piernas': 'squat', 'Sentadilla hack': 'squat', 'Sentadilla goblet': 'squat', 'Zancadas': 'lunge', 'Estocadas en Smith': 'lunge', 'Sentadilla búlgara': 'lunge',
+  'Extensión de cuádriceps': 'kneeExt', 'Camilla de cuádriceps': 'kneeExt', 'Curl femoral acostado': 'kneeFlex', 'Curl femoral sentado': 'kneeFlex',
+  'Hip thrust': 'hipExt', 'Patada de glúteo en polea': 'hipExt', 'Abducción en máquina': 'abd', 'Aducción en máquina': 'add',
+  'Elevación de talones de pie': 'calfStr', 'Gemelos en prensa': 'calfStr', 'Elevación de talones unilateral con mancuerna': 'calfStr', 'Elevación de talones sentado': 'calfBent',
+  'Plancha': 'abs', 'Crunch en polea': 'abs', 'Elevación de piernas colgado': 'abs', 'Rueda abdominal': 'abs' };
+  const o = {}; Object.keys(P).forEach(k => o[norm(k)] = P[k]); return o; })();
+const PDEF = { Pecho: 'hPush', Espalda: 'hPull', Hombro: 'vPush', Bíceps: 'curl', Tríceps: 'tri', Cuádriceps: 'squat', Femoral: 'kneeFlex', Glúteo: 'hipExt', Gemelos: 'calfStr', Abdomen: 'abs', Antebrazo: 'wrist', Trapecio: 'shrug', Aductores: 'add' };
+function patOf(id) { const x = exById(id); if (!x) return 'other'; return x.pat || PAT[norm(x.name)] || PDEF[x.muscle] || 'other'; }
+// Qué funciones conviene cubrir en la SEMANA para cada músculo (no en cada sesión), con la evidencia que la respalda
+const REQ = {
+  'Cuádriceps': [{ any: ['squat', 'lunge'], label: 'Un multiarticular (sentadilla, prensa, hack o búlgara)', why: 'Trabaja todos los vastos con mucha carga, y también glúteos y aductores.', ex: ['Sentadilla hack', 'Prensa de piernas', 'Sentadilla búlgara'], src: 1 },
+    { any: ['kneeExt'], label: 'Extensión de rodilla', why: 'El recto femoral (la parte del cuádriceps que también cruza la cadera) casi no crece con sentadillas, pero sí con extensiones de rodilla.', ex: ['Extensión de cuádriceps'], src: 1 }],
+  'Femoral': [{ any: ['kneeFlex'], label: 'Flexión de rodilla (curl femoral)', why: 'Es la función principal del femoral en la rodilla. El curl sentado (con la cadera flexionada, el músculo más estirado) dio más crecimiento que el acostado.', ex: ['Curl femoral sentado', 'Curl femoral acostado'], src: 2 },
+    { any: ['hinge'], label: 'Extensión de cadera (peso muerto rumano)', why: 'El femoral también extiende la cadera, y ese movimiento carga distinto a sus porciones que el curl. Conviene tener las dos funciones.', ex: ['Peso muerto rumano', 'Buenos días'], src: 3 }],
+  'Glúteo': [{ any: ['hinge', 'hipExt', 'squat', 'lunge'], label: 'Extensión de cadera con carga', why: 'Sentadilla y hip thrust hicieron crecer el glúteo de forma parecida; cualquiera de los dos (o el rumano) cumple.', ex: ['Hip thrust', 'Peso muerto rumano'], src: 4 },
+    { any: ['abd'], label: 'Abducción de cadera', why: 'Trabaja el glúteo medio, que se ocupa de estabilizar la cadera. Es opcional: la evidencia sobre cuánto suma es limitada.', ex: ['Abducción en máquina'], opt: 'prio', src: 4 }],
+  'Pecho': [{ any: ['hPush', 'incPush'], label: 'Un press (empuje)', why: 'Es la base para el pecho, con carga alta y también tríceps y hombro anterior.', ex: ['Press de banca con mancuernas', 'Press en máquina'], src: 5 },
+    { any: ['incPush'], label: 'Un press inclinado', why: 'Un estudio encontró más crecimiento de la parte superior del pecho con press inclinado. La evidencia es limitada: es una mejora menor.', ex: ['Press inclinado con mancuernas', 'Press inclinado con barra'], opt: 'soft', src: 5 }],
+  'Espalda': [{ any: ['vPull'], label: 'Tracción vertical (jalón o dominadas)', why: 'Tira con los brazos desde arriba: trabaja sobre todo los dorsales.', ex: ['Jalón al pecho', 'Dominadas'], src: 6 },
+    { any: ['hPull'], label: 'Tracción horizontal (remo)', why: 'Tira hacia el abdomen: trabaja más la espalda media y alta (romboides, trapecio medio) y el deltoide posterior.', ex: ['Remo en polea baja', 'Remo con mancuerna'], src: 6 }],
+  'Deltoide lateral': [{ any: ['lat'], label: 'Elevaciones laterales', why: 'Los press de hombro trabajan sobre todo el deltoide anterior; el lateral necesita trabajo directo para crecer bien.', ex: ['Elevaciones laterales', 'Elevaciones laterales en polea'], src: 7 }],
+  'Deltoide posterior': [{ any: ['rear', 'hPull'], label: 'Remos o trabajo directo', why: 'Los remos ya lo trabajan; si queda corto de series, sumá pájaros o face pull.', ex: ['Face pull', 'Pájaros (deltoide posterior)'], src: 6 }],
+  'Tríceps': [{ any: ['ohTri'], label: 'Extensión por encima de la cabeza', why: 'Con el brazo arriba, la cabeza larga se estira: en un estudio el tríceps creció ~40% más que con extensiones en polea abajo.', ex: ['Extensión de tríceps sobre la cabeza'], src: 8 }],
+  'Bíceps': [{ any: ['curl', 'curlLong', 'curlShort'], label: 'Un curl', why: 'Los remos y jalones lo trabajan, pero un curl directo asegura el estímulo.', ex: ['Curl con mancuernas'], src: 9 },
+    { any: ['curlLong'], label: 'Un curl con el brazo atrás (inclinado o bayesian)', why: 'El curl inclinado hizo crecer más la parte cercana al hombro y el predicador la cercana al codo: combinarlos da un desarrollo más completo. Mejora menor.', ex: ['Curl en banco inclinado', 'Curl bayesian en polea'], opt: 'soft', src: 9 }],
+  'Gemelos': [{ any: ['calfStr'], label: 'Gemelos con la rodilla estirada (de pie o en prensa)', why: 'Con la rodilla estirada el gemelo crece mucho más que sentado; el sóleo creció parecido en los dos.', ex: ['Elevación de talones de pie', 'Gemelos en prensa'], src: 10 }],
+};
+const ASRC = { 1: ['Squat vs extensión de cuádriceps (J Sports Sci, 2021)', 'https://www.strengthlog.com/squat-vs-leg-extension/'], 2: ['Maeo et al., 2021: curl sentado vs acostado', 'https://sci-sport.com/en/hypertrophy-and-hamstring-protection-seated-prone-leg-curl/'],
+  3: ['Bourne et al., 2017: activación de los femorales por ejercicio', 'https://bjsm.bmj.com/content/51/13/1021.abstract'], 4: ['Plotkin et al., 2023: hip thrust vs sentadilla', 'https://www.shred.app/thinking/hip-thrust-vs-squat-glutes'],
+  5: ['Press plano vs inclinado (Chaves 2020, Albarello 2022)', 'https://www.strongerbyscience.com/?p=57858'], 6: ['Práctica habitual de entrenamiento: tracción vertical y horizontal', ''],
+  7: ['Press vs elevaciones laterales (Campos 2020)', 'https://barbend.com/is-the-overhead-press-worth-it-for-hypertrophy'], 8: ['Maeo et al., 2022: tríceps por encima de la cabeza', 'https://barbend.com/overhead-triceps-extensions-vs-pushdowns-muscle-growth-study'],
+  9: ['Kassiano et al., 2025: curl inclinado vs predicador', 'https://sci-sport.com/en/effects-of-incline-and-preacher-curls-on-regional-hypertrophy-and-strength-266/'], 10: ['Kinoshita et al., 2023: gemelos de pie vs sentado', 'https://barbend.com/new-study-standing-vs-seated-calf-raises'],
+  11: ['Kassiano et al., 2022: variar ejercicios', 'https://pubmed.ncbi.nlm.nih.gov/35438660/'], 12: ['Remmert et al., 2025: series por sesión', 'https://www.eurekalert.org/news-releases/1086804'],
+  13: ['Schoenfeld et al., 2016: frecuencia', 'https://pubmed.ncbi.nlm.nih.gov/27102172/'], 14: ['Singer et al., 2024: descansos', 'https://doaj.org/article/18363f4031e0487793db2084bee23f38'] };
+// Minutos estimados de un día: series × (trabajo + descanso) + preparación de cada ejercicio + entrada en calor
+function dayMin(r, ph, w) { return Math.round((r.items.reduce((a, it) => { const p = prescribe(it, ph, w); return a + p.sets * (40 + p.rest) + 90; }, 0) + 300) / 60); }
+function analyzePlan() {
+  const c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1, days = planDays();
+  const inPlan = new Set(days.flatMap(r => r.items.map(i => i.exerciseId))), used = new Set(S.sessions.flatMap(s => s.exercises.map(e => e.exerciseId)));
+  const dis = (S.settings.anDis || {}), recs = [], add = r => { if (!dis[r.key]) recs.push(r); };
+  const IT = days.flatMap((r, d) => r.items.map(it => { const p = prescribe(it, ph, w), ex = exById(it.exerciseId) || { name: '(ejercicio)' };
+    return { r, d, it, ex, pat: patOf(it.exerciseId), mm: exMus(it.exerciseId, ex.name), main: mainMus(it.exerciseId), sets: p.sets }; }));
+  const mins = days.map(r => dayMin(r, ph, w));
+  const pick = (names, pats) => { const L = names.map(n => S.exercises.find(x => norm(x.name) === norm(n))).filter(Boolean);
+    S.exercises.forEach(x => { if (pats.includes(patOf(x.id)) && !L.includes(x)) L.push(x); });
+    return L.filter(x => !inPlan.has(x.id)).sort((a, b) => used.has(b.id) - used.has(a.id))[0] || null; };
+  const wkSets = m => IT.reduce((a, x) => a + (x.mm[m] || 0) * x.sets, 0);
+  const consumed = new Set(), newPats = new Set();
+  const sat = (m, list) => (REQ[m] || []).map(q => list.some(x => q.any.includes(x.pat) && (x.mm[m] || 0) > 0));
+  // 1) Cobertura: funciones que faltan en toda la semana
+  const cover = [];
+  Object.entries(REQ).forEach(([m, reqs]) => {
+    const trained = IT.some(x => (x.mm[m] || 0) >= 1) || wkSets(m) > 0;
+    reqs.forEach((q, qi) => {
+      const have = IT.filter(x => q.any.includes(x.pat) && (x.mm[m] || 0) > 0);
+      cover.push({ m, q, have });
+      if (have.length || !days.length) return;
+      if (q.opt === 'prio' && !isPrio(m)) return;
+      if (!trained && !MRANGE(m)) return;
+      const sug = pick(q.ex, q.any); if (!sug) return;
+      // ¿Se puede reemplazar un ejercicio del mismo músculo sin perder otra función? (primero los repetidos)
+      const before = sat(m, IT), sp = patOf(sug.id), smm = exMus(sug.id);
+      const okRep = x => { const after = sat(m, IT.map(y => y === x ? { ...y, pat: sp, mm: smm } : y)); return before.every((v, k) => !v || after[k]); };
+      const isDup = x => IT.some(y => y !== x && y.pat === x.pat && y.main === x.main), dayDup = x => IT.some(y => y !== x && y.d === x.d && y.pat === x.pat && y.main === x.main);
+      const dup = IT.filter(x => x.main === m && !consumed.has(x.it.id) && okRep(x)).sort((a, b) => dayDup(b) - dayDup(a) || isDup(b) - isDup(a) || a.sets - b.sets)[0];
+      const base = { key: `cov:${m}:${qi}`, cat: 'Cobertura', m, src: q.src, soft: !!q.opt };
+      if (dup) { consumed.add(dup.it.id); newPats.add(m + ':' + sp);
+        add({ ...base, type: 'replace', rid: dup.r.id, iid: dup.it.id, to: sug.id,
+          title: `${m}: falta ${q.label.toLowerCase()}`, why: `${q.why} ${isDup(dup) ? `Ya tenés dos ejercicios con el mismo patrón (${esc(PATN[dup.pat].toLowerCase())}), así que no hace falta sumar uno más: cambiá uno.` : 'Reemplazando este ejercicio cubrís la función sin alargar la sesión ni perder nada de lo que ya trabajás.'}`,
+          act: `Cambiar <b>${esc(dup.ex.name)}</b> por <b>${esc(sug.name)}</b> en ${esc(dup.r.name)}` }); return; }
+      newPats.add(m + ':' + sp);
+      // Si no, agregarlo al día más corto que ya trabaje ese grupo (sin pasarse de duración)
+      const cand = days.map((r, d) => ({ r, d, n: r.items.length, min: mins[d], hits: IT.filter(x => x.d === d && (x.mm[m] || 0) > 0).length })).filter(x => x.n < 8 && x.min < 75).sort((a, b) => (b.hits > 0) - (a.hits > 0) || a.min - b.min)[0];
+      if (cand) add({ ...base, type: 'add', rid: cand.r.id, to: sug.id, title: `${m}: falta ${q.label.toLowerCase()}`, why: q.why + (cand.min > 60 ? '' : ' Este día tiene lugar sin hacerse largo.'),
+        act: `Agregar <b>${esc(sug.name)}</b> (3 series) a ${esc(cand.r.name)} · queda en ~${cand.min + 7} min` });
+      else add({ ...base, type: 'info', title: `${m}: falta ${q.label.toLowerCase()}`, why: q.why + ' Tus días ya están largos: conviene reemplazar algún ejercicio en vez de agregar.', act: `Por ejemplo: ${esc(sug.name)}` });
+    });
+  });
+  // 2) Redundancia: mismo patrón para el mismo músculo, el mismo día
+  days.forEach((r, d) => { const L = IT.filter(x => x.d === d);
+    L.forEach((x, i) => L.slice(i + 1).forEach(y => {
+      if (x.pat !== y.pat || x.main !== y.main || x.pat === 'other' || consumed.has(y.it.id) || consumed.has(x.it.id)) return;
+      const m = x.main; if (isPrio(m)) return;
+      const rg = MRANGE(m); if (rg && wkSets(m) < rg[0]) return; // si falta volumen, repetir el patrón tiene sentido
+      const have = new Set(IT.filter(z => (z.mm[m] || 0) > 0).map(z => z.pat)); newPats.forEach(k => { if (k.startsWith(m + ':')) have.add(k.split(':')[1]); });
+      const alts = [...new Set(S.exercises.filter(z => mainMus(z.id) === m).map(z => patOf(z.id)))].filter(p => !have.has(p) && p !== 'other');
+      const alt = alts.map(p => pick((REQ[m] || []).flatMap(q => q.any.includes(p) ? q.ex : []), [p])).find(Boolean);
+      if (!alt) return; consumed.add(y.it.id);
+      add({ key: `dup:${y.it.id}`, cat: 'Redundancia', type: 'replace', rid: r.id, iid: y.it.id, to: alt.id, m, src: 11, soft: true,
+        title: `${esc(r.name)}: ${esc(x.ex.name)} y ${esc(y.ex.name)} hacen casi lo mismo`, why: `Los dos son ${esc(PATN[x.pat].toLowerCase())} para ${m}. Variar de forma planificada (patrones distintos) ayuda más que repetir uno parecido. Es opcional: si te gusta así, descartalo.`,
+        act: `Cambiar <b>${esc(y.ex.name)}</b> por <b>${esc(alt.name)}</b> (${esc(PATN[patOf(alt.id)].toLowerCase())})` }); })); });
+  // 3) Distribución: demasiadas series de un músculo en un solo día, o un músculo grande entrenado un solo día
+  AM.forEach(([m]) => { const rg = MRANGE(m); if (!rg || rg[0] < 10 || days.length < 2) return;
+    const per = days.map((r, d) => IT.filter(x => x.d === d).reduce((a, x) => a + (x.mm[m] || 0) * x.sets, 0)), direct = days.map((r, d) => IT.some(x => x.d === d && (x.mm[m] || 0) >= 1));
+    const big = per.findIndex(v => v > 11), nd = direct.filter(Boolean).length;
+    const di = big >= 0 ? big : nd === 1 && IT.filter(x => x.d === direct.indexOf(true) && (x.mm[m] || 0) >= 1).length >= 2 ? direct.indexOf(true) : -1;
+    if (di < 0) return;
+    const mv = IT.filter(x => x.d === di && x.main === m && !consumed.has(x.it.id)).sort((a, b) => a.sets - b.sets)[0]; if (!mv) return;
+    const grp = (AM.find(a => a[0] === m) || [])[2], sameG = d => IT.some(x => x.d === d && Object.keys(x.mm).some(k => (AM.find(a => a[0] === k) || [])[2] === grp && x.mm[k] >= 1));
+    const to = days.map((r, d) => ({ r, d, v: per[d], min: mins[d], g: sameG(d) })).filter(x => x.d !== di && x.min < 75).sort((a, b) => b.g - a.g || a.v - b.v || a.min - b.min)[0]; if (!to) return;
+    consumed.add(mv.it.id);
+    add({ key: `mv:${m}:${mv.it.id}`, cat: 'Distribución', type: 'move', rid: days[di].id, iid: mv.it.id, to: to.r.id, m, src: big >= 0 ? 12 : 13,
+      title: big >= 0 ? `${m}: ${half(per[di])} series en ${esc(days[di].name)}` : `${m}: lo entrenás de forma directa un solo día`,
+      why: big >= 0 ? 'Más de ~11 series de un músculo en una sesión suman poco: el crecimiento se estanca y aumenta el cansancio. Repartirlas en dos días rinde más con el mismo trabajo.' : 'Entrenar cada músculo al menos 2 veces por semana dio mejores resultados que 1 vez. Movés un ejercicio y la sesión queda más corta.',
+      act: `Mover <b>${esc(mv.ex.name)}</b> de ${esc(days[di].name)} a ${esc(to.r.name)}` }); });
+  // 3b) Volumen bajo con las funciones ya cubiertas: sumar series a lo que ya hacés antes que agregar ejercicios
+  AM.forEach(([m]) => { const rg = MRANGE(m); if (!rg) return; const v = wkSets(m), gap = rg[0] - v; if (gap < 1.5) return;
+    const cand = IT.filter(x => x.main === m && x.sets < 5 && !consumed.has(x.it.id) && mins[x.d] < 80).sort((a, b) => a.sets - b.sets || mins[a.d] - mins[b.d])[0]; if (!cand) return;
+    const n = Math.min(2, Math.ceil(gap), 5 - cand.sets);
+    add({ key: `vol:${m}:${cand.it.id}`, cat: 'Volumen', type: 'sets', rid: cand.r.id, iid: cand.it.id, n, m, src: 12,
+      title: `${m}: ${half(v)} series por semana`, why: `Tu objetivo es ${rg[0]}–${rg[1]}. Ya tenés las funciones principales cubiertas, así que en vez de agregar otro ejercicio alcanza con sumar series a uno que ya hacés (cada serie suma ~2 minutos).`,
+      act: `Pasar <b>${esc(cand.ex.name)}</b> de ${cand.sets} a ${cand.sets + n} series en ${esc(cand.r.name)}` }); });
+  // 4) Duración de cada día
+  days.forEach((r, d) => { if (mins[d] <= 80 && r.items.length <= 8) return;
+    add({ key: `dur:${r.id}:${r.items.length}`, cat: 'Duración', type: 'info', rid: r.id, src: 12,
+      title: `${esc(r.name)}: ~${mins[d]} min y ${r.items.length} ejercicios`, why: 'Es una sesión larga: al final rendís menos y cuesta sostenerla. Las sugerencias de reemplazo o de mover ejercicios de arriba ayudan a acortarla.', act: 'Considerá sacar el ejercicio que más se repite o pasarlo a otro día.' }); });
+  // 5) Descansos muy cortos en ejercicios grandes
+  const shortR = IT.filter(x => !isIso(x.it.exerciseId) && prescribe(x.it, ph, w).rest < 90);
+  if (shortR.length) add({ key: `rest:${shortR.map(x => x.it.id).join(',')}`, cat: 'Descansos', type: 'rest', items: shortR.map(x => [x.r.id, x.it.id]), src: 14,
+    title: `${shortR.length} ${shortR.length === 1 ? 'ejercicio grande tiene' : 'ejercicios grandes tienen'} menos de 1:30 de descanso`, why: 'Descansar más de 1 minuto da un pequeño beneficio para crecer, sobre todo porque sostenés mejor el peso en las series siguientes. En multiarticulares, 2 minutos es un buen punto.',
+    act: `Poner 2:00 en ${shortR.slice(0, 3).map(x => esc(x.ex.name)).join(', ')}${shortR.length > 3 ? '…' : ''}` });
+  const ord = { Cobertura: 0, Volumen: 1, Distribución: 2, Redundancia: 3, Duración: 4, Descansos: 5 };
+  recs.sort((a, b) => (isPrio(b.m) - isPrio(a.m)) || (a.soft - b.soft) || ord[a.cat] - ord[b.cat]);
+  return { recs, cover, days, mins, IT };
+}
+function vAnalysis() {
+  const A0 = analyzePlan(), { recs, cover, days, mins } = A0;
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Tu plan</div><h1 style="margin-top:6px">Análisis del plan</h1>
+    <p class="mu sm" style="margin-top:-6px">Revisa todos los días juntos: qué funciones trabaja cada músculo, ejercicios repetidos, cómo se reparte el trabajo y cuánto dura cada sesión. Nada cambia hasta que vos lo aplicás.</p>`;
+  if (!days.length) return h + `<div class="card mu">Cuando tengas días en tu plan, acá vas a ver el análisis.</div>`;
+  h += `<div class="tiles"><div class="tile"><b>${days.length}</b><span>Días</span></div><div class="tile"><b>${A0.IT.length}</b><span>Ejercicios</span></div><div class="tile"><b>~${Math.round(mins.reduce((a, b) => a + b, 0) / days.length)}</b><span>Min por día</span></div></div>`;
+  h += `<h2>Sugerencias${recs.length ? ' · ' + recs.length : ''}</h2>`;
+  if (!recs.length) h += `<div class="card row">${ico('shield')}<div class="sp"><div class="t" style="font-size:16px">Tu plan está bien armado</div><div class="mu sm">Cubre las funciones principales de cada músculo, sin repeticiones de más y con sesiones de duración razonable.</div></div></div>`;
+  const CI = { Volumen: ['bars', 'pink'], Cobertura: ['target', ''], Redundancia: ['compare', 'violet'], Distribución: ['bars', 'blue'], Duración: ['clock', 'orange'], Descansos: ['clock', 'blue'] };
+  recs.forEach((r, i) => { const s = ASRC[r.src];
+    h += `<div class="card rec"><div class="row" style="align-items:flex-start;gap:12px">${ico(...CI[r.cat])}<div class="sp"><div class="kicker" style="font-size:11.5px">${r.cat}${r.soft ? ' · opcional' : ''}</div>
+      <div class="t" style="font-size:16px;margin-top:3px">${r.title}</div></div></div>
+      <p class="sm" style="margin:10px 0 6px;line-height:1.5;color:var(--tx);opacity:.88">${r.why}</p>
+      <div class="recact sm">${r.act}</div>
+      ${s ? `<div class="mu sm" style="margin-top:8px">Fuente: ${s[1] ? `<a href="${s[1]}" target="_blank" rel="noopener">${esc(s[0])}</a>` : esc(s[0])}</div>` : ''}
+      <div class="row" style="gap:8px;margin-top:12px">${r.type !== 'info' ? `<button class="pri sp" data-a="anApply" data-k="${esc(r.key)}">Aplicar</button>` : ''}<button class="${r.type === 'info' ? 'sp' : ''} ghost" data-a="anDismiss" data-k="${esc(r.key)}">${r.type === 'info' ? 'Entendido' : 'Descartar'}</button></div></div>`; });
+  // Cobertura por músculo
+  h += `<h2>Funciones de cada músculo en la semana</h2><div class="card" style="padding:4px 18px">${Object.keys(REQ).map(m => {
+    const L = cover.filter(x => x.m === m);
+    return `<div class="covm"><div class="row"><b class="sp">${isPrio(m) ? '<span style="color:var(--gold)">★</span> ' : ''}${esc(m)}</b><span class="mu sm">${half(A0.IT.reduce((a, x) => a + (x.mm[m] || 0) * x.sets, 0))} series/sem</span></div>
+      ${L.map(x => `<div class="covr ${x.have.length ? 'ok' : x.q.opt ? 'opt' : 'no'}"><i>${x.have.length ? '✓' : x.q.opt ? '·' : '✕'}</i><span class="sp">${esc(x.q.label)}${x.q.opt && !x.have.length ? ' <span class="mu">(opcional)</span>' : ''}</span><span class="mu">${x.have.map(h2 => esc(h2.ex.name)).slice(0, 2).join(', ')}</span></div>`).join('')}</div>`; }).join('')}</div>`;
+  // Días
+  h += `<h2>Duración estimada</h2><div class="card" style="padding:4px 18px">${days.map((r, d) => `<div class="exrow"><div class="sp"><div style="font-weight:600">${esc(r.name)}</div><div class="mu sm">${r.items.length} ejercicios · ${r.items.reduce((a, it) => a + prescribe(it, progCtx() ? progCtx().ph : null, progCtx() ? progCtx().wEff : 1).sets, 0)} series</div></div>
+    <b class="${mins[d] > 80 ? 'warn' : ''}">~${mins[d]} min</b></div>`).join('')}</div>
+    <p class="mu sm">Incluye series, descansos, 1:30 para preparar cada ejercicio y 5 minutos de entrada en calor.</p>`;
+  h += `<h2>Cómo analiza</h2><div class="card sm" style="line-height:1.55">
+    <p style="margin-top:0">Mira la <b>semana completa</b>: si una función ya está en otro día, no te pide repetirla.</p>
+    <p>Cuando falta algo, primero busca un ejercicio <b>repetido</b> para reemplazar; recién después propone agregar, y solo en días que no queden largos.</p>
+    <p>No marca como repetido un ejercicio de un músculo <b>prioritario</b> o que todavía no llega a su objetivo de series.</p>
+    <p style="margin-bottom:0">Las reglas salen de estudios de hipertrofia y de la práctica habitual. Son orientativas: si algo no te sirve (por ejemplo, no hay esa máquina en tu gimnasio), descartalo.</p></div>`;
+  if ((S.settings.anDis && Object.keys(S.settings.anDis).length)) h += `<button class="big ghost" data-a="anReset">Volver a mostrar las sugerencias descartadas</button>`;
+  return h;
+}
 /* ---------- Comparar ciclos ---------- */
 let cmpA = null, cmpB = null;
 function periods() {
@@ -1612,7 +1797,7 @@ window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
   try { seedBio(); } catch (e) {}
-  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, maxes: vMaxes, compare: vCompare, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, maxes: vMaxes, compare: vCompare, analysis: vAnalysis, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -1627,7 +1812,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', analysis: 'train', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -1888,6 +2073,9 @@ function vTrain() {
         <button class="${nx ? 'pri' : ''}" data-a="start" data-id="${r.id}">Empezar</button></div></div>`;
     });
   }
+  if (P.act.length) { const n = analyzePlan().recs.length;
+    h += `<div class="card clickable" data-a="openAnalysis" style="margin-top:4px"><div class="row">${ico('target', n ? 'orange' : '')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div>
+      <div class="mu sm">${n ? `${n} ${n === 1 ? 'sugerencia' : 'sugerencias'} para mejorar tu semana` : 'Tu semana está bien armada'}</div></div><span class="mu">›</span></div></div>`; }
   if (loose.length) {
     h += `<h2>${c ? 'Rutinas sueltas' : 'Tus rutinas'}</h2>`;
     loose.forEach(r => h += `<div class="card row"><div class="sp clickable" data-a="routineMenu" data-id="${r.id}"><div class="t">${esc(r.name)}</div><div class="mu sm">${r.items.length} ejercicios</div></div><button data-a="start" data-id="${r.id}">Empezar</button></div>`);
@@ -2011,6 +2199,9 @@ function vEdit() {
     if (i < d.items.length - 1) h += `<button class="sslink ${it.ss ? 'on' : ''}" data-a="itSS" data-i="${i}">${it.ss ? '⛓ Superserie con el siguiente · tocá para separar' : '+ Hacer superserie con el siguiente'}</button>`;
   });
   h += `<button class="big" style="background:var(--s1)" data-a="pickForRoutine">+ Añadir ejercicio</button>`;
+  if (!d._new && planDays().some(r => r.id === d.id)) { const R0 = analyzePlan().recs.filter(r => r.rid === d.id || r.to === d.id);
+    h += `<div class="card clickable" data-a="anFromEdit" style="margin-top:14px"><div class="row">${ico('target')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div>
+      <div class="mu sm">${R0.length ? `${R0.length} ${R0.length === 1 ? 'sugerencia' : 'sugerencias'} para este día · guarda y abre el análisis` : 'Revisá cómo se complementa este día con el resto de la semana'}</div></div><span class="mu">›</span></div></div>`; }
   return h;
 }
 
@@ -2962,6 +3153,7 @@ const A = {
       <label class="f"><span>Nombre</span><input id="ee_n" value="${esc(e.name)}"></label>
       <label class="f"><span>Músculo principal</span><select id="ee_m">${MUSCLES.map(m => `<option ${m === e.muscle ? 'selected' : ''}>${m}</option>`).join('')}</select></label>
       <label class="f"><span>Equipamiento</span><select id="ee_e">${EQUIP.map(q => `<option ${q === exInfo(e).eq ? 'selected' : ''}>${q}</option>`).join('')}</select></label>
+      <label class="f"><span>Tipo de movimiento (para el análisis del plan)</span><select id="ee_p">${Object.keys(PATN).map(k => `<option value="${k}" ${patOf(e.id) === k ? 'selected' : ''}>${PATN[k]}</option>`).join('')}</select></label>
       <div class="f"><span>Músculos que trabaja (para contar series)</span><div class="chips" id="ee_mm">${eeChips(e)}</div>
       <div class="mu sm" style="margin-top:6px">Tocá para cambiar: principal (cuenta 1) → secundario (½) → no trabaja.</div></div>
       <button class="toggle ${e.unilateral ? 'on' : ''}" id="ee_u" data-a="eeUni"><span class="sp"><b>Unilateral</b><br><span class="mu sm">Se hace con un brazo o una pierna a la vez</span></span><span class="sw"><i></i></span></button>
@@ -2982,13 +3174,14 @@ const A = {
     if (S.exercises.some(x => x.id !== e.id && norm(x.name) === norm(n))) { toast('Ya existe un ejercicio con ese nombre'); return; }
     e.name = n; e.muscle = $('#ee_m').value; e.unilateral = $('#ee_u').classList.contains('on'); e.u = Date.now();
     const eq = $('#ee_e').value, I = INFO[norm(n)]; if (I && I[0] === eq) delete e.eq; else e.eq = eq;
+    const pt = $('#ee_p').value; if (PAT[norm(n)] === pt) delete e.pat; else e.pat = pt;
     if (eeMM && JSON.stringify(eeMM) !== JSON.stringify(MMAP[norm(n)] || null)) e.mm = eeMM; else if (eeMM) delete e.mm;
     renameEverywhere(e.id, e); closeModal(); save(); render(); toast('Ejercicio actualizado');
   },
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (['coach', 'muscles', 'body', 'maxes', 'compare'].includes(R.view)) { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'analysis') { go('train'); return; } if (R.view === 'muscle') { go('muscles'); return; } if (['coach', 'muscles', 'body', 'maxes', 'compare'].includes(R.view)) { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -3073,6 +3266,26 @@ const A = {
   },
   openCoach: () => go('coach'),
   openMaxes: () => go('maxes'),
+  openAnalysis: () => go('analysis'),
+  anFromEdit: () => { A.saveEdit(); go('analysis'); },
+  anDismiss: d => { S.settings.anDis = Object.assign({}, S.settings.anDis, { [d.k]: Date.now() }); S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  anReset: () => { S.settings.anDis = {}; S.settings.u = Date.now(); save(); render(); },
+  anApply: d => {
+    const rec = analyzePlan().recs.find(r => r.key === d.k); if (!rec) return;
+    const c = progCtx(), ph = c ? c.ph : null, R1 = S.routines.find(r => r.id === rec.rid);
+    const vals = id => { const f = R1 && R1.phaseId && findPhase(R1.phaseId); return f ? tplVals(tplOf(f.ph), f.ph.type, id) : null; };
+    let msg = 'Listo';
+    if (rec.type === 'replace' && R1) { const it = R1.items.find(x => x.id === rec.iid); if (!it) return; const old = (exById(it.exerciseId) || {}).name;
+      it.exerciseId = rec.to; const v = vals(rec.to); if (v) Object.assign(it, v); it.notes = ''; touch(R1); msg = `${old} → ${(exById(rec.to) || {}).name}`; }
+    else if (rec.type === 'add' && R1) { const f0 = R1.items[0] || {};
+      R1.items.push(Object.assign({ id: uid(), exerciseId: rec.to, sets: 3, repMin: f0.repMin || 8, repMax: f0.repMax || 12, rest: f0.rest || S.settings.rest, notes: '', pct: null, rir: f0.rir ?? null }, vals(rec.to) || {})); touch(R1); msg = `Agregado a ${R1.name}`; }
+    else if (rec.type === 'move' && R1) { const R2 = S.routines.find(r => r.id === rec.to), i = R1.items.findIndex(x => x.id === rec.iid); if (!R2 || i < 0) return;
+      const [it] = R1.items.splice(i, 1); it.ss = false; R2.items.push(it); touch(R1); touch(R2); msg = `Movido a ${R2.name}`; }
+    else if (rec.type === 'sets' && R1) { const it = R1.items.find(x => x.id === rec.iid); if (!it) return; it.sets += rec.n; touch(R1); msg = `${(exById(it.exerciseId) || {}).name}: ${it.sets} series`; }
+    else if (rec.type === 'rest') { rec.items.forEach(([rid, iid]) => { const r = S.routines.find(x => x.id === rid), it = r && r.items.find(x => x.id === iid); if (it) { it.rest = 120; touch(r); } }); msg = 'Descansos en 2:00'; }
+    const fp = R1 && R1.phaseId && findPhase(R1.phaseId); if (fp) touch(fp.prog);
+    save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(msg);
+  },
   openCompare: () => go('compare'),
   tf: d => { tf = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   exM: d => { exM = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
