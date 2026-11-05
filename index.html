@@ -559,6 +559,14 @@ b.warn{color:#ffb347}
 .rb.ok:before{content:'+';color:var(--ac)}.rb.no:before{content:'−';color:#ffb347}
 .ring2{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:conic-gradient(var(--ac) calc(var(--p)*1%),var(--s2) 0);position:relative}
 .ring2:before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--s1)}.ring2 b{position:relative;font-size:20px;font-variant-numeric:tabular-nums}
+.pvsel{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;padding:8px 0;font-size:14px;line-height:1.35;color:var(--mu);border-top:1px solid var(--ln);border-radius:0}
+.pvsel:first-of-type{border-top:0}.pvsel i{flex-shrink:0;width:20px;height:20px;border-radius:6px;border:1.5px solid var(--mu);font-style:normal;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.pvsel.on{color:var(--tx)}.pvsel.on i{background:var(--ac);border-color:var(--ac);color:#111;font-weight:800}
+.pvrow{display:flex;gap:10px;align-items:center;padding:11px 0;border-top:1px solid var(--ln)}.pvrow:first-child{border-top:0}
+.pvno{width:20px;height:20px;flex-shrink:0;border-radius:50%;font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.pvrow[class*=pv-] .pvno{background:var(--s3)}.pvrow.pv-add .pvno,.pvrow.pv-rep .pvno{background:var(--ac);color:#111}.pvrow.pv-del .pvno{background:#ff6b6b;color:#111}.pvrow.pv-mov .pvno,.pvrow.pv-sets .pvno{background:#6aa8ff;color:#111}
+.pvname{font-weight:600}.pv-add .pvname,.pv-rep .pvname{color:var(--ac)}.pvold{text-decoration:line-through;color:var(--mu);font-size:14px}.pv-del .pvold{font-size:15px}
+.pvv{min-width:34px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:8px}.pvv.ok{color:var(--ac)}.pvv.lo{color:#ffb347}.pvv.hi{color:#ff6b6b}
 </style>
 </head>
 <body>
@@ -579,7 +587,7 @@ b.warn{color:#ffb347}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '8.1';
+const KEY = 'entreno.v1', VERSION = '8.2';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1344,7 +1352,6 @@ function vMuscles() {
   });
   h += `<p class="mu sm">Series hechas${cur && Object.keys(P).length ? ' / las que pide tu plan (rayita blanca)' : ''}. La zona marcada es el rango recomendado por semana. Cada serie cuenta entera para el músculo principal del ejercicio y la mitad para los secundarios. Tocá un músculo para ver qué ejercicios suman.</p>`;
   const T = musTips(cur ? P : {}, W);
-  if (cur && planDays().length) h += `<div class="card clickable" data-a="openAnalysis"><div class="row">${ico('target')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div><div class="mu sm">Qué cambiar en tus días para equilibrar la semana</div></div><span class="mu">›</span></div></div>`;
   if (T.t.length) h += `<h2>Sugerencias${T.isPlan ? ' para tu plan' : ''}</h2><div class="card sm" style="line-height:1.5">${T.t.slice(0, 6).map(x => `<p style="margin:6px 0">${x}</p>`).join('')}</div>`;
   else h += `<div class="card sm">✓ ${T.isPlan ? 'Tu plan' : 'Esta semana'} tiene un volumen equilibrado en todos los músculos.</div>`;
   const D = {}; for (let k = 0; k < 4; k++) { const w4 = musWeek(addDays(weekStart(), -7 * k)); Object.keys(w4).forEach(m => D[m] = (D[m] || 0) + w4[m].sets); }
@@ -1502,7 +1509,7 @@ function evalPlan(P) {
       o.V += v; o.dayV[di] += v; if (mm[m] >= 1) o.dd[di] = true; o.pat[pt] = (o.pat[pt] || 0) + v; } }));
   AM.forEach(([m]) => { const rg = MRANGE(m); if (!rg) return;
     const o = mus[m] || { V: 0, dayV: Array(nd).fill(0), dd: [], pat: {} }, pr = isPrio(m) ? 1.5 : 1, lo = isPrio(m) ? Math.round((rg[0] + rg[1]) / 2) : rg[0], big = rg[0] >= 10;
-    if (o.V < lo) put('vol:' + m, pr * 1.2 * Math.pow((lo - o.V) / lo, 1.3), { m, kind: 'vol', V: o.V, lo, hi: rg[1] });
+    if (o.V < lo - .01) put('vol:' + m, pr * (.15 + 1.6 * (lo - o.V) / lo), { m, kind: 'vol', V: o.V, lo, hi: rg[1] });
     else if (o.V > rg[1] * 1.1) put('volhi:' + m, (o.V - rg[1]) / rg[1] * .6, { m, kind: 'volhi', V: o.V, hi: rg[1] });
     if (big && nd >= 2 && o.V >= 6 && o.dd.filter(Boolean).length <= 1) put('freq:' + m, .45 * pr, { m, kind: 'freq' });
     o.dayV.forEach((v, di) => { if (v > 11) put(`ses:${m}:${di}`, (v - 11) / 11 * .8, { m, kind: 'ses', di, V: v }); });
@@ -1511,7 +1518,7 @@ function evalPlan(P) {
       if (wq > 0 && share < want) put(`fn:${m}:${qi}`, wq * (want - share) / want, { m, kind: 'fn', qi, share }); });
   });
   P.days.forEach((d, di) => { const mi = dMin(d);
-    if (mi > 70) put('dur:' + di, (mi - 70) / 15 * .8, { kind: 'dur', di, min: mi });
+    if (mi > 75) put('dur:' + di, (mi - 75) / 20 * .6, { kind: 'dur', di, min: mi });
     if (d.items.length > 8) put('cnt:' + di, (d.items.length - 8) * .3, { kind: 'cnt', di, n: d.items.length });
     d.items.forEach((x, i) => d.items.slice(i + 1).forEach(y => { const px = PTc(x.ex); if (px !== PTc(y.ex) || px === 'other' || mainMus(x.ex) !== mainMus(y.ex) || isPrio(mainMus(x.ex))) return;
       put(`dup:${di}:${x.iid}:${y.iid}`, .2, { kind: 'dup', di, m: mainMus(x.ex), a: x.ex, b: y.ex, pat: px }); })); });
@@ -1526,19 +1533,70 @@ const planScore = t => Math.round(100 / (1 + t / 5));
 function partText(p, P, mode) {
   const dn = di => esc((P.days[di] || {}).name || ''), q = p.kind === 'fn' ? REQ[p.m][p.qi] : null;
   switch (p.kind) {
-    case 'vol': return mode === 'issue' ? `<b>${p.m}</b>: ${half(p.V)} series por semana, ${isPrio(p.m) ? 'es tu prioridad y conviene apuntar a' : 'el objetivo es'} ${p.lo}–${p.hi}.` : `<b>${p.m}</b>: hoy hace ${half(p.V)} series por semana y su objetivo es ${p.lo}–${p.hi}; se acerca.`;
+    case 'vol': return mode === 'issue' ? `<b>${p.m}</b>: queda en ${half(p.V)} series por semana, ${isPrio(p.m) ? 'es tu prioridad y conviene apuntar a' : 'el objetivo es'} ${p.lo}–${p.hi}.` : `<b>${p.m}</b>: hoy hace ${half(p.V)} series por semana y su objetivo es ${p.lo}–${p.hi}; se acerca.`;
     case 'volhi': return mode === 'issue' ? `<b>${p.m}</b>: ${half(p.V)} series por semana, más de lo útil (${p.hi}).` : `<b>${p.m}</b>: menos volumen de más.`;
     case 'freq': return mode === 'issue' ? `<b>${p.m}</b>: lo entrenás de forma directa un solo día; 2 días por semana rinde más.` : `<b>${p.m}</b>: pasa a entrenarse 2 días por semana.`;
     case 'ses': return mode === 'issue' ? `<b>${p.m}</b>: ${half(p.V)} series en ${dn(p.di)}; más de ~11 en una sesión suman poco.` : `<b>${p.m}</b>: menos series de más en una sola sesión.`;
     case 'fn': return mode === 'issue' ? `<b>${p.m}</b>: ${p.share > 0 ? 'poco trabajo de' : 'falta'} ${q.label.toLowerCase()}.` : `<b>${p.m}</b>: suma ${q.label.toLowerCase()}, que hoy es ${p.share > 0 ? 'solo el ' + Math.round(p.share * 100) + '%' : 'el 0%'} de sus series (conviene ~25% o más). ${q.why}`;
-    case 'dur': return mode === 'issue' ? `<b>${dn(p.di)}</b> dura ~${p.min} min.` : `<b>${dn(p.di)}</b> queda más corta.`;
+    case 'dur': return mode === 'issue' ? `<b>${dn(p.di)}</b> dura ~${p.min} min (lo razonable es hasta ~75).` : `<b>${dn(p.di)}</b> dura ~${p.min} min; queda más corta.`;
     case 'cnt': return mode === 'issue' ? `<b>${dn(p.di)}</b> tiene ${p.n} ejercicios.` : `<b>${dn(p.di)}</b> tiene menos ejercicios.`;
     case 'dup': return mode === 'issue' ? `<b>${dn(p.di)}</b>: ${esc(exById(p.a).name)} y ${esc(exById(p.b).name)} son el mismo patrón (${PATN[p.pat].toLowerCase()}).` : `Deja de repetir el mismo patrón de ${p.m} en ${dn(p.di)}.`;
     case 'bal': return mode === 'issue' ? `Empuje y tracción ${p.nm}: ${p.push} contra ${p.pull} series por semana.` : `Más equilibrio entre empujar y tirar (${p.nm}).`;
   }
   return '';
 }
-let _anMemo = null;
+// Aplica una sugerencia a tus rutinas de verdad
+function applyRec(rec) {
+    const R1 = S.routines.find(r => r.id === rec.rid); if (!R1) return null;
+    const vals = id => { const f = R1.phaseId && findPhase(R1.phaseId); return f ? tplVals(tplOf(f.ph), f.ph.type, id) : null; };
+    const exn = id => (exById(id) || {}).name; let msg = 'Listo';
+    const i = R1.items.findIndex(x => x.id === rec.iid), it = R1.items[i];
+    if (rec.type === 'rep' && it) { const old = exn(it.exerciseId), v = vals(rec.to); it.exerciseId = rec.to; it.notes = ''; if (v) Object.assign(it, { repMin: v.repMin, repMax: v.repMax, pct: v.pct, rir: v.rir, rest: v.rest }); msg = `${old} → ${exn(rec.to)}`; }
+    else if (rec.type === 'add') { const f0 = R1.items[0] || {}, v = vals(rec.to) || {};
+      R1.items.push(Object.assign({ id: uid(), exerciseId: rec.to, repMin: f0.repMin || 8, repMax: f0.repMax || 12, rest: f0.rest || S.settings.rest, notes: '', pct: null, rir: f0.rir ?? null }, v, { sets: rec.sets || 3 })); msg = `Agregado a ${R1.name}`; }
+    else if (rec.type === 'del' && it) { R1.items.splice(i, 1); msg = `${exn(it.exerciseId)} sacado de ${R1.name}`; }
+    else if (rec.type === 'mov' && it) { const R2 = S.routines.find(r => r.id === rec.to); if (!R2) return null; R1.items.splice(i, 1); it.ss = false; R2.items.push(it); touch(R2); msg = `Movido a ${R2.name}`; }
+    else if (rec.type === 'sets' && it) { it.sets = Math.max(1, it.sets + rec.n); msg = `${exn(it.exerciseId)}: ${it.sets} series`; }
+    else return null;
+    touch(R1); const fp = R1.phaseId && findPhase(R1.phaseId); if (fp) touch(fp.prog);
+    return msg;
+}
+let _anMemo = null, anTab = 'recs', anOff = new Set();
+// Aplica una sugerencia al modelo (sin tocar tus rutinas) y anota qué cambió, para la vista previa
+function applyOp(Q, op, no, mk) {
+  const d = Q.days.find(z => z.rid === op.rid); if (!d) return; const i = d.items.findIndex(x => x.iid === op.iid), x = d.items[i];
+  if (op.type === 'add') { const it = { iid: 'new' + op.to, ex: op.to, sets: op.sets || 3, rest: op.rest || S.settings.rest }; d.items.push(it); mk.it[it.iid] = { k: 'add', no }; return; }
+  if (!x) return;
+  if (op.type === 'rep') { mk.it[x.iid] = { k: 'rep', no, from: x.ex }; x.ex = op.to; if (op.rest) x.rest = op.rest; }
+  else if (op.type === 'del') { d.items.splice(i, 1); (mk.gone[d.rid] = mk.gone[d.rid] || []).push({ ex: x.ex, sets: x.sets, no }); }
+  else if (op.type === 'mov') { const d2 = Q.days.find(z => z.rid === op.to); if (!d2) return; d.items.splice(i, 1); d2.items.push(x); (mk.gone[d.rid] = mk.gone[d.rid] || []).push({ ex: x.ex, sets: x.sets, no, to: d2.name }); mk.it[x.iid] = { k: 'mov', no, from: d.name }; }
+  else if (op.type === 'sets') { const m0 = mk.it[x.iid]; mk.it[x.iid] = Object.assign({}, m0 || { k: 'sets', no }, { s0: m0 && m0.s0 != null ? m0.s0 : x.sets }); x.sets += op.n; }
+}
+function anPreview() {
+  const A0 = analyzePlan(), Q = cloneP(A0.P0), mk = { it: {}, gone: {} }, sel = A0.recs.filter(r => !anOff.has(r.key));
+  A0.recs.forEach((r, i) => { if (!anOff.has(r.key)) applyOp(Q, r.op, i + 1, mk); });
+  const E1 = evalPlan(Q); return { Q, mk, E1, sel, score: planScore(E1.total) };
+}
+function vPreview(A0) {
+  const { Q, mk, E1, sel, score } = anPreview(), P0 = A0.P0, E0 = A0.E0, exn = id => esc((exById(id) || {}).name || '');
+  let h = `<div class="card"><div class="mu sm" style="margin-bottom:8px">Elegí qué sugerencias incluir; abajo ves cómo quedaría tu semana.</div>${A0.recs.map((r, i) => `<button class="pvsel ${anOff.has(r.key) ? '' : 'on'}" data-a="anTog" data-k="${esc(r.key)}"><i>${anOff.has(r.key) ? '' : '✓'}</i><span class="sp"><b class="mu">${i + 1}</b> ${r.title}</span></button>`).join('')}
+    <div class="row" style="gap:14px;margin-top:12px;align-items:center"><div class="sp mu sm">Equilibrio del plan</div><b style="font-size:18px">${A0.score0} → <span style="color:${score > A0.score0 ? 'var(--ac)' : 'var(--tx)'}">${score}</span></b></div>
+    <button class="big pri" style="margin-top:12px" data-a="anApplySel" ${sel.length ? '' : 'disabled'}>Aplicar ${sel.length === A0.recs.length ? 'todas' : 'seleccionadas'} (${sel.length})</button></div>`;
+  Q.days.forEach((d, di) => { const m0 = dMin(P0.days[di]), m1 = dMin(d);
+    h += `<h2 style="display:flex;justify-content:space-between"><span>${esc(d.name)}</span><span class="mu" style="font-weight:500;text-transform:none;letter-spacing:0">~${m0}${m1 !== m0 ? ` → <b style="color:var(--tx)">${m1}</b>` : ''} min</span></h2><div class="card" style="padding:4px 16px">`;
+    d.items.forEach(x => { const m = mk.it[x.iid];
+      h += `<div class="pvrow ${m ? 'pv-' + m.k : ''}">${m ? `<span class="pvno">${m.no}</span>` : '<span class="pvno"></span>'}<div class="sp">
+        ${m && m.k === 'rep' ? `<div class="pvold">${exn(m.from)}</div>` : ''}<div class="pvname">${m && m.k === 'add' ? '+ ' : ''}${exn(x.ex)}</div>
+        ${m && m.k === 'mov' ? `<div class="mu sm">Viene de ${esc(m.from)}</div>` : ''}</div>
+        <span class="mu sm" style="white-space:nowrap">${m && m.s0 != null && m.s0 !== x.sets ? `${m.s0} → <b style="color:var(--ac)">${x.sets}</b>` : x.sets} series</span></div>`; });
+    (mk.gone[d.rid] || []).forEach(g => { h += `<div class="pvrow pv-del"><span class="pvno">${g.no}</span><div class="sp"><div class="pvold">${exn(g.ex)}</div>${g.to ? `<div class="mu sm">Pasa a ${esc(g.to)}</div>` : ''}</div><span class="mu sm">${g.to ? 'movido' : 'sale'}</span></div>`; });
+    h += `</div>`; });
+  const ch = AM.map(a => a[0]).filter(m => MRANGE(m) && Math.abs(((E1.mus[m] || {}).V || 0) - ((E0.mus[m] || {}).V || 0)) > .01);
+  if (ch.length) h += `<h2>Series por semana que cambian</h2><div class="card" style="padding:4px 16px">${ch.map(m => { const a = (E0.mus[m] || {}).V || 0, b = (E1.mus[m] || {}).V || 0, rg = MRANGE(m), st = v => v < rg[0] ? 'lo' : v > rg[1] ? 'hi' : 'ok';
+    return `<div class="exrow"><div class="sp"><div style="font-weight:600">${esc(m)}</div><div class="mu sm">Objetivo ${rg[0]}–${rg[1]}</div></div><span class="pvv ${st(a)}">${half(a)}</span><span class="mu">→</span><span class="pvv ${st(b)}">${half(b)}</span></div>`; }).join('')}</div>
+    <p class="mu sm">Verde: dentro del objetivo. Naranja: por debajo. Rojo: por encima.</p>`;
+  return h;
+}
 function analyzePlan() {
   const P0 = planModel(), sig = JSON.stringify([P0, S.settings.mt, S.settings.mprio, S.settings.anDis, S.exercises.length]);
   if (_anMemo && _anMemo.sig === sig) return _anMemo.res;
@@ -1563,7 +1621,9 @@ function analyzePlan() {
         C.push({ type: 'add', di, to: e.id, cost: .15, key: `add:${d.rid}:${e.id}`, f: Q => { Q.days[di].items.push({ iid: 'new' + e.id, ex: e.id, sets: Math.min(3, v.sets), rest: v.rest }); } }); });
     });
     let best = null;
+    const volWorse = e2 => Object.keys(e2.parts).some(k => k.startsWith('vol:') && e2.parts[k].v > ((E.parts[k] || {}).v || 0) + .001);
     C.forEach(c => { if (dis[c.key]) return; const Q = cloneP(P); c.f(Q); const e2 = evalPlan(Q), gain = E.total - e2.total - c.cost;
+      if ((c.type === 'del' || (c.type === 'sets' && c.n < 0)) && volWorse(e2)) return;
       if (gain > .1 && (!best || gain > best.gain)) best = { ...c, gain, Q, e2 }; });
     if (!best) break;
     const d = P.days[best.di], x = d.items[best.ii], better = [], worse = [];
@@ -1578,7 +1638,8 @@ function analyzePlan() {
     const srcs = [...new Set(better.filter(b => b.p.kind === 'fn').map(b => REQ[b.p.m][b.p.qi].src).concat(better.some(b => b.p.kind === 'ses') ? [12] : [], better.some(b => b.p.kind === 'freq') ? [13] : [], better.some(b => b.p.kind === 'dup') ? [11] : []))];
     const cat = better[0] ? { vol: 'Volumen', volhi: 'Volumen', freq: 'Frecuencia', ses: 'Distribución', fn: 'Funciones', dur: 'Duración', cnt: 'Duración', dup: 'Variedad', bal: 'Equilibrio' }[better[0].p.kind] : 'Plan';
     const mD = dMin(best.Q.days[best.di]) - dMin(d), mJ = best.type === 'mov' ? dMin(best.Q.days[best.dj]) - dMin(P.days[best.dj]) : 0;
-    recs.push({ key: best.key, type: best.type, cat, title, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: best.type === 'add' ? best.Q.days[best.di].items.slice(-1)[0].sets : null,
+    const nx = best.type === 'add' ? best.Q.days[best.di].items.slice(-1)[0] : best.type === 'rep' ? best.Q.days[best.di].items[best.ii] : null;
+    recs.push({ op: { type: best.type, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: nx ? nx.sets : null, rest: nx ? nx.rest : null }, key: best.key, type: best.type, cat, title, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: best.type === 'add' ? best.Q.days[best.di].items.slice(-1)[0].sets : null,
       gain: best.gain, better: [...new Set(better.map(b => partText(b.p, P, 'fix')))].slice(0, 3), worse: [...new Set(worse.map(b => partText(b.p, best.Q, 'issue')))].slice(0, 2), srcs,
       dur: best.type === 'mov' ? `${dn}: ${mD > 0 ? '+' : ''}${mD} min · ${esc(P.days[best.dj].name)}: ${mJ > 0 ? '+' : ''}${mJ} min` : mD ? `${dn}: ${mD > 0 ? '+' : ''}${mD} min (queda en ~${dMin(best.Q.days[best.di])})` : 'Misma duración' });
     [x && x.iid, best.type === 'add' ? 'new' + best.to : null].filter(Boolean).forEach(k => locked.add(k));
@@ -1597,9 +1658,11 @@ function vAnalysis() {
   h += `<div class="card"><div class="row" style="align-items:center;gap:14px"><div class="ring2" style="--p:${A0.score0}"><b>${A0.score0}</b></div><div class="sp"><div class="t" style="font-size:17px">Equilibrio del plan</div>
     <div class="mu sm">${A0.score0 >= 85 ? 'Muy bien armado.' : A0.score0 >= 70 ? 'Bien armado, con algunos detalles para pulir.' : 'Hay cosas importantes para mejorar.'}${recs.length && A0.score1 > A0.score0 ? ` Con las sugerencias llega a <b style="color:var(--ac)">${A0.score1}</b>.` : ''}</div></div></div>
     <div class="tiles" style="margin-top:14px"><div class="tile"><b>${days.length}</b><span>Días</span></div><div class="tile"><b>${days.reduce((a, d) => a + d.items.length, 0)}</b><span>Ejercicios</span></div><div class="tile"><b>~${Math.round(mins.reduce((a, b) => a + b, 0) / days.length)}</b><span>Min por día</span></div></div></div>`;
-  h += `<h2>Sugerencias${recs.length ? ' · ' + recs.length : ''}</h2>`;
+  if (recs.length) h += `<div class="seg" style="margin-top:16px"><button class="${anTab === 'recs' ? 'on' : ''}" data-a="anTab" data-k="recs">Sugerencias · ${recs.length}</button><button class="${anTab === 'prev' ? 'on' : ''}" data-a="anTab" data-k="prev">Cómo quedaría</button></div>`;
+  if (recs.length && anTab === 'prev') return h + vPreview(A0);
+  if (!recs.length) h += `<h2>Sugerencias</h2>`;
   if (!recs.length) h += `<div class="card row">${ico('shield')}<div class="sp"><div class="t" style="font-size:16px">No encontré cambios que mejoren tu plan</div><div class="mu sm">Probé reemplazos, cambios de series, mover ejercicios y agregar o sacar: ninguno mejora el conjunto lo suficiente.</div></div></div>`;
-  else h += `<p class="mu sm" style="margin-top:-4px">Están en orden: cada una se calculó teniendo en cuenta las anteriores. Podés aplicar solo las que quieras; el análisis se rehace solo.</p>`;
+  else h += `<p class="mu sm" style="margin-top:-4px">Están en orden: cada una se calculó teniendo en cuenta las anteriores. Podés aplicar solo las que quieras; el análisis se rehace solo. En <b>Cómo quedaría</b> ves la rutina con los cambios antes de decidir.</p>`;
   const CI = { Volumen: ['bars', 'pink'], Funciones: ['target', ''], Frecuencia: ['calx', 'blue'], Distribución: ['bars', 'blue'], Duración: ['clock', 'orange'], Variedad: ['compare', 'violet'], Equilibrio: ['compare', 'blue'], Plan: ['target', ''] };
   recs.forEach((r, i) => {
     h += `<div class="card rec"><div class="row" style="align-items:flex-start;gap:12px">${ico(...(CI[r.cat] || CI.Plan))}<div class="sp"><div class="kicker" style="font-size:11.5px">${i + 1} · ${r.cat}</div>
@@ -1843,7 +1906,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', analysis: 'train', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', analysis: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -2104,9 +2167,6 @@ function vTrain() {
         <button class="${nx ? 'pri' : ''}" data-a="start" data-id="${r.id}">Empezar</button></div></div>`;
     });
   }
-  if (P.act.length) { const n = analyzePlan().recs.length;
-    h += `<div class="card clickable" data-a="openAnalysis" style="margin-top:4px"><div class="row">${ico('target', n ? 'orange' : '')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div>
-      <div class="mu sm">${n ? `${n} ${n === 1 ? 'sugerencia' : 'sugerencias'} para mejorar tu semana` : 'Tu semana está bien armada'}</div></div><span class="mu">›</span></div></div>`; }
   if (loose.length) {
     h += `<h2>${c ? 'Rutinas sueltas' : 'Tus rutinas'}</h2>`;
     loose.forEach(r => h += `<div class="card row"><div class="sp clickable" data-a="routineMenu" data-id="${r.id}"><div class="t">${esc(r.name)}</div><div class="mu sm">${r.items.length} ejercicios</div></div><button data-a="start" data-id="${r.id}">Empezar</button></div>`);
@@ -2230,9 +2290,6 @@ function vEdit() {
     if (i < d.items.length - 1) h += `<button class="sslink ${it.ss ? 'on' : ''}" data-a="itSS" data-i="${i}">${it.ss ? '⛓ Superserie con el siguiente · tocá para separar' : '+ Hacer superserie con el siguiente'}</button>`;
   });
   h += `<button class="big" style="background:var(--s1)" data-a="pickForRoutine">+ Añadir ejercicio</button>`;
-  if (!d._new && planDays().some(r => r.id === d.id)) { const R0 = analyzePlan().recs.filter(r => r.rid === d.id || r.to === d.id);
-    h += `<div class="card clickable" data-a="anFromEdit" style="margin-top:14px"><div class="row">${ico('target')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div>
-      <div class="mu sm">${R0.length ? `${R0.length} ${R0.length === 1 ? 'sugerencia' : 'sugerencias'} para este día · guarda y abre el análisis` : 'Revisá cómo se complementa este día con el resto de la semana'}</div></div><span class="mu">›</span></div></div>`; }
   return h;
 }
 
@@ -2275,6 +2332,9 @@ function vProgress() {
     h += `<div class="card clickable" data-a="openMuscles"><div class="row">${ico('bars', 'pink')}<div class="sp"><div class="t" style="font-size:16px">Series por músculo</div>
       <div class="mu sm">Esta semana: ${ok} de ${main.length} en rango</div></div><span class="mu">›</span></div>
       <div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div></div>`; }
+  if (planDays().length) { const A1 = analyzePlan(), n = A1.recs.length;
+    h += `<div class="card clickable" data-a="openAnalysis"><div class="row">${ico('shield', n ? 'orange' : '')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div>
+      <div class="mu sm">Equilibrio ${A1.score0}/100 · ${n ? `${n} ${n === 1 ? 'sugerencia' : 'sugerencias'}` : 'bien armado'}</div></div><span class="mu">›</span></div></div>`; }
   h += `<div class="card clickable" data-a="openCompare"><div class="row">${ico('compare', 'violet')}<div class="sp"><div class="t" style="font-size:16px">Comparar ciclos</div>
     <div class="mu sm">Una fase contra otra, o estas semanas contra las anteriores</div></div><span class="mu">›</span></div></div>`;
   { const L = S.body[S.body.length - 1], d = bodyDelta();
@@ -3212,7 +3272,7 @@ const A = {
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { if (R.view === 'analysis') { go('train'); return; } if (R.view === 'muscle') { go('muscles'); return; } if (['coach', 'muscles', 'body', 'maxes', 'compare'].includes(R.view)) { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (['coach', 'muscles', 'body', 'maxes', 'compare', 'analysis'].includes(R.view)) { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -3298,25 +3358,17 @@ const A = {
   openCoach: () => go('coach'),
   openMaxes: () => go('maxes'),
   openAnalysis: () => go('analysis'),
-  anFromEdit: () => { A.saveEdit(); go('analysis'); },
   anDismiss: d => { S.settings.anDis = Object.assign({}, S.settings.anDis, { [d.k]: Date.now() }); S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
   anReset: () => { S.settings.anDis = {}; S.settings.u = Date.now(); save(); render(); },
+  anTab: d => { anTab = d.k; render(); window.scrollTo(0, 0); },
+  anTog: d => { anOff.has(d.k) ? anOff.delete(d.k) : anOff.add(d.k); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  anApplySel: () => { const L = analyzePlan().recs.filter(r => !anOff.has(r.key)); if (!L.length) return;
+    ask(`¿Aplicar ${L.length} ${L.length === 1 ? 'cambio' : 'cambios'}?`, 'Se van a modificar tus rutinas tal como ves en la vista previa.', 'Aplicar', () => { L.forEach(r => applyRec(r)); anOff = new Set(); anTab = 'recs'; save(); render(); window.scrollTo(0, 0); toast(`${L.length} ${L.length === 1 ? 'cambio aplicado' : 'cambios aplicados'}`); }); },
   anApply: d => {
-    const rec = analyzePlan().recs.find(r => r.key === d.k); if (!rec) return;
-    const R1 = S.routines.find(r => r.id === rec.rid); if (!R1) return;
-    const vals = id => { const f = R1.phaseId && findPhase(R1.phaseId); return f ? tplVals(tplOf(f.ph), f.ph.type, id) : null; };
-    const exn = id => (exById(id) || {}).name; let msg = 'Listo';
-    const i = R1.items.findIndex(x => x.id === rec.iid), it = R1.items[i];
-    if (rec.type === 'rep' && it) { const old = exn(it.exerciseId), v = vals(rec.to); it.exerciseId = rec.to; it.notes = ''; if (v) Object.assign(it, { repMin: v.repMin, repMax: v.repMax, pct: v.pct, rir: v.rir, rest: v.rest }); msg = `${old} → ${exn(rec.to)}`; }
-    else if (rec.type === 'add') { const f0 = R1.items[0] || {}, v = vals(rec.to) || {};
-      R1.items.push(Object.assign({ id: uid(), exerciseId: rec.to, repMin: f0.repMin || 8, repMax: f0.repMax || 12, rest: f0.rest || S.settings.rest, notes: '', pct: null, rir: f0.rir ?? null }, v, { sets: rec.sets || 3 })); msg = `Agregado a ${R1.name}`; }
-    else if (rec.type === 'del' && it) { R1.items.splice(i, 1); msg = `${exn(it.exerciseId)} sacado de ${R1.name}`; }
-    else if (rec.type === 'mov' && it) { const R2 = S.routines.find(r => r.id === rec.to); if (!R2) return; R1.items.splice(i, 1); it.ss = false; R2.items.push(it); touch(R2); msg = `Movido a ${R2.name}`; }
-    else if (rec.type === 'sets' && it) { it.sets = Math.max(1, it.sets + rec.n); msg = `${exn(it.exerciseId)}: ${it.sets} series`; }
-    else return;
-    touch(R1); const fp = R1.phaseId && findPhase(R1.phaseId); if (fp) touch(fp.prog);
+    const rec = analyzePlan().recs.find(r => r.key === d.k); if (!rec) return; const msg = applyRec(rec); if (!msg) return;
     save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(msg);
   },
+
 
   openCompare: () => go('compare'),
   tf: d => { tf = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
