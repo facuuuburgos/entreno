@@ -596,7 +596,7 @@ b.warn{color:#ffb347}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '8.6';
+const KEY = 'entreno.v1', VERSION = '8.7';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1581,6 +1581,13 @@ function evalPlan(P) {
     d.items.forEach((x, i) => d.items.slice(i + 1).forEach(y => { const px = PTc(x.ex); if (px !== PTc(y.ex) || px === 'other' || mainMus(x.ex) !== mainMus(y.ex)) return;
       put(`dup:${di}:${x.iid}:${y.iid}`, 3, .15, { kind: 'dup', di, m: mainMus(x.ex), a: x.ex, b: y.ex, pat: px }); }));
     d.items.forEach(x => { if (x.sets > EXCAP) put('exs:' + x.iid, 2, (x.sets - EXCAP) * 1, { kind: 'exs', di, iid: x.iid, ex: x.ex, sets: x.sets, m: mainMus(x.ex) }); }); });
+  // Días parejos: que ninguno sea mucho más largo, con muchos más ejercicios o con muchos más ejercicios pesados que el promedio
+  if (nd >= 2) { const avg = a => a.reduce((x, y) => x + y, 0) / a.length, mins = P.days.map(dMin), cnt = P.days.map(d => d.items.length), hv = P.days.map(d => d.items.filter(x => !isIso(x.ex)).length);
+    const aM = avg(mins), aC = avg(cnt), aH = avg(hv);
+    P.days.forEach((d, di) => { const dm = mins[di] - aM, dc = cnt[di] - aC, dh = hv[di] - aH;
+      if (dm > 6) put('bald:' + di, 2, (dm - 6) / 10 * 1.1, { kind: 'bald', di, min: mins[di], avg: Math.round(aM) });
+      if (dc > 1.5) put('balc:' + di, 2, (dc - 1.5) * .4, { kind: 'balc', di, n: cnt[di], avg: Math.round(aC * 10) / 10 });
+      if (dh > 1.5) put('bali:' + di, 2, (dh - 1.5) * .4, { kind: 'bali', di, n: hv[di], avg: Math.round(aH * 10) / 10 }); }); }
   const S2 = pts => P.days.reduce((a, d) => a + d.items.filter(x => pts.includes(PTc(x.ex))).reduce((b, x) => b + x.sets, 0), 0);
   [[['hPush', 'incPush'], ['hPull'], 'horizontal'], [['vPush'], ['vPull'], 'vertical']].forEach(([pu, pl, nm]) => { const a = S2(pu), b = S2(pl), r = Math.max(a, b) / Math.max(1, Math.min(a, b));
     if (a + b >= 6 && r > 1.8) put('bal:' + nm, 2, .15 * (r - 1.8), { kind: 'bal', nm, push: a, pull: b, pl: a > b ? pl : pu }); });
@@ -1605,7 +1612,7 @@ function genCands(P, E, X) {
   const SETS = (o, n, why) => { if (o.x.sets + n < 2 || o.x.sets + n > cap(o.x.ex)) return; push({ type: 'sets', di: o.di, ii: o.ii, iid: o.x.iid, n, cost: .02 * Math.abs(n), key: `sets:${o.x.iid}:${o.x.sets + n}`, why, f: Q => { Q.days[o.di].items[o.ii].sets += n; } }); };
   const REP = (o, to, why, cost) => { const v = X.tv(o.d, to); push({ type: 'rep', di: o.di, ii: o.ii, iid: o.x.iid, to, cost, key: `rep:${o.x.iid}:${to}`, why, f: Q => Object.assign(Q.days[o.di].items[o.ii], { ex: to, rest: v.rest, reps: v.reps }) }); };
   const ADD = (di, to, why) => { const d = P.days[di], v = X.tv(d, to), sets = Math.min(v.sets, head(d) >= 10 ? 3 : 2); push({ type: 'add', di, to, sets, cost: .25, key: `add:${d.rid}:${to}`, why, f: Q => Q.days[di].items.push({ iid: 'new' + to, ex: to, sets, rest: v.rest, reps: v.reps }) }); };
-  const MOV = (o, dj, why) => push({ type: 'mov', di: o.di, ii: o.ii, iid: o.x.iid, dj, cost: .06, key: `mov:${o.x.iid}:${P.days[dj].rid}`, why, f: Q => { const [it] = Q.days[o.di].items.splice(o.ii, 1); Q.days[dj].items.push(it); } });
+  const MOV = (o, dj, why) => push({ type: 'mov', di: o.di, ii: o.ii, iid: o.x.iid, dj, cost: isIso(o.x.ex) ? .05 : .15, key: `mov:${o.x.iid}:${P.days[dj].rid}`, why, f: Q => { const [it] = Q.days[o.di].items.splice(o.ii, 1); Q.days[dj].items.push(it); } });
   const DEL = (o, why) => push({ type: 'del', di: o.di, ii: o.ii, iid: o.x.iid, cost: .12, key: `del:${o.x.iid}`, why, f: Q => { Q.days[o.di].items.splice(o.ii, 1); } });
   const libPats = m => [...new Set(X.lib.filter(e => isMain(e.id, m)).map(e => PTc(e.id)))];
   const fnPats = m => (REQ[m] || []).flatMap(q => q.any);
@@ -1657,6 +1664,14 @@ function genCands(P, E, X) {
         libPats(m).sort((a, b) => have.has(a) - have.has(b)).slice(0, 3).forEach(pt => pick(m, [pt], o.x.ex).forEach(id => { const v = X.tv(d2, id);
           push({ type: 'split', di: o.di, ii: o.ii, iid: o.x.iid, dj, to: id, n: -k, sets: k, cost: .1, key: `split:${o.x.iid}:${id}:${d2.rid}`, why: { kind: 'exs', m, k },
             f: Q => { Q.days[o.di].items[o.ii].sets -= k; Q.days[dj].items.push({ iid: 'new' + id, ex: id, sets: k, rest: v.rest, reps: v.reps }); } }); })); }); } }
+    if (p.kind === 'bald' || p.kind === 'balc' || p.kind === 'bali') { const d = P.days[p.di], m0 = dMin(d), w = { kind: 'bald', di: p.di, sub: p.kind };
+      d.items.forEach((x, ii) => { const o = { d, di: p.di, ii, x }; if (p.kind === 'bali' && isIso(x.ex)) return;
+        P.days.forEach((d2, dj) => { if (dj === p.di || dMin(d2) >= m0 - 3 || !fitsG(d2, exGrp(x.ex))) return; MOV(o, dj, w);
+          // pasar series a un ejercicio del mismo músculo en el día más liviano
+          if (p.kind === 'bald' && x.sets > 2) d2.items.forEach((y, jj) => { if (mainMus(y.ex) !== mainMus(x.ex) || y.sets >= EXCAP) return;
+            push({ type: 'shift', di: p.di, ii, iid: x.iid, dj, iid2: y.iid, ex2: y.ex, n: -1, sets: 1, cost: .03, key: `shift:${x.iid}:${y.iid}`, why: Object.assign({ k: 1, m: mainMus(x.ex) }, w),
+              f: Q => { Q.days[p.di].items[ii].sets -= 1; Q.days[dj].items[jj].sets += 1; } }); }); });
+        if (p.kind === 'bald') SETS(o, -1, w); }); }
     if (p.kind === 'bal') items.filter(o => p.pl.includes(PTc(o.x.ex))).forEach(o => SETS(o, 1, { kind: 'bal', nm: p.nm }));
   });
   return [...C.values()];
@@ -1685,13 +1700,16 @@ function partText(p, P) {
     case 'dur': return `<b>${dn(p.di)}</b> dura ~${p.min} min y tu tiempo disponible es ${p.lim}.`;
     case 'dup': return `<b>${dn(p.di)}</b>: ${esc(exById(p.a).name)} y ${esc(exById(p.b).name)} son el mismo movimiento (${PATN[p.pat].toLowerCase()}). No está mal, pero es lo primero que conviene variar si falta otra cosa.`;
     case 'bal': return `Empuje y tracción ${p.nm}: ${p.push} contra ${p.pull} series por semana.`;
+    case 'bald': return `<b>${dn(p.di)}</b> dura ~${p.min} min y tus días duran en promedio ~${p.avg}: conviene que se parezcan.`;
+    case 'balc': return `<b>${dn(p.di)}</b> tiene ${p.n} ejercicios y tus días tienen en promedio ${fmtNum(p.avg).replace('.', ',')}.`;
+    case 'bali': return `<b>${dn(p.di)}</b> tiene ${p.n} ejercicios pesados (multiarticulares) y tus días tienen en promedio ${fmtNum(p.avg).replace('.', ',')}.`;
     case 'exs': return `<b>${esc(exById(p.ex).name)}</b> tiene ${p.sets} series en ${dn(p.di)}: más de ${EXCAP} del mismo ejercicio rinden cada vez menos.`;
   }
   return '';
 }
 function solved(p, P) { const dn = di => esc((P.days[di] || {}).name || '');
   return { zero: `<b>${p.m}</b> pasa a tener trabajo.`, vol: `<b>${p.m}</b> llega a su objetivo de series.`, volhi: `<b>${p.m}</b> vuelve a su rango de series.`, freq: `<b>${p.m}</b> pasa a entrenarse 2 días por semana.`,
-    ses: `<b>${p.m}</b> ya no se pasa de series en ${dn(p.di)}.`, fn: p.kind === 'fn' ? `<b>${p.m}</b> ya cubre ${REQ[p.m][p.qi].label.toLowerCase()}.` : '', dur: `<b>${dn(p.di)}</b> entra en tu tiempo disponible.`, bal: `Empuje y tracción ${p.nm} quedan parejos.`, exs: p.ex ? `<b>${esc(exById(p.ex).name)}</b> queda en ${EXCAP} series o menos.` : '' }[p.kind] || ''; }
+    ses: `<b>${p.m}</b> ya no se pasa de series en ${dn(p.di)}.`, fn: p.kind === 'fn' ? `<b>${p.m}</b> ya cubre ${REQ[p.m][p.qi].label.toLowerCase()}.` : '', dur: `<b>${dn(p.di)}</b> entra en tu tiempo disponible.`, bal: `Empuje y tracción ${p.nm} quedan parejos.`, bald: `<b>${dn(p.di)}</b> queda con una duración pareja al resto.`, balc: `<b>${dn(p.di)}</b> queda con una cantidad de ejercicios pareja al resto.`, bali: `<b>${dn(p.di)}</b> queda con una carga pareja al resto.`, exs: p.ex ? `<b>${esc(exById(p.ex).name)}</b> queda en ${EXCAP} series o menos.` : '' }[p.kind] || ''; }
 function simWhy(a, b) { const r = []; const A = MMc(a), B = MMc(b), sh = Object.keys(A).filter(m => A[m] >= 1 && (B[m] || 0) >= 1);
   if (sh.length) r.push('mismo músculo principal'); if (PTc(a) === PTc(b)) r.push('mismo movimiento'); if (lenOf(a) === lenOf(b)) r.push('mismo perfil de carga'); if (exInfo(exById(a)).eq === exInfo(exById(b)).eq) r.push('mismo equipo');
   return r.join(', ') || 'músculos parecidos'; }
@@ -1716,14 +1734,23 @@ function explain(c, P, E, Q, e2) {
     case 'freq': t = `<b>${w.m}</b> se entrena de forma directa un solo día por semana. ${c.type === 'mov' ? `Pasando ${b(x.ex)} a ${dn(c.dj)} lo trabajás 2 días con las mismas series.` : `Sumando ${b(c.to)} en ${dn(c.di)} lo trabajás 2 días.`} Repartir las series de un músculo en 2 días rinde más que hacerlas todas juntas.`; break;
     case 'dur': t = `<b>${dn(w.di)}</b> dura ~${m0} min y tu tiempo disponible es ${lim}. ${c.type === 'sets' ? `Bajar una serie de ${b(x.ex)} ahorra ~${m0 - m1} min.` : c.type === 'mov' ? `${dn(c.dj)} tiene lugar: pasando ${b(x.ex)} ahí lo acortás sin perder series en la semana.` : `Sacar ${b(x.ex)} lo acorta ~${m0 - m1} min.`}`; break;
     case 'ses': t = `${dn(w.di)} acumula ${half(E.mus[w.m].dayV[w.di])} series de <b>${w.m}</b>. Pasadas ~11 series de un músculo en una sesión, las siguientes suman cada vez menos. Pasar ${b(x.ex)} a ${dn(c.dj)} reparte ese trabajo sin perder series en la semana.`; break;
+    case 'bald': { const dj = c.dj, a0 = m0, b0 = dj != null ? dMin(P.days[dj]) : 0, a1 = m1, b1 = dj != null ? dMin(Q.days[dj]) : 0, n0 = d.items.length, n2 = dj != null ? P.days[dj].items.length : 0;
+      const why0 = dj == null ? '' : w.sub === 'balc' ? `${dn(c.di)} tiene ${n0} ejercicios y ${dn(dj)} ${n2}` : w.sub === 'bali' ? `${dn(c.di)} concentra más ejercicios pesados que ${dn(dj)}` : `${dn(c.di)} dura ~${a0} min y ${dn(dj)} ~${b0}`;
+      const fit = dj != null ? P.days[dj].items.filter(y => exGrp(y.ex) === exGrp(x.ex)).map(y => nm(y.ex)).slice(0, 2) : [];
+      t = c.type === 'mov' ? `${why0}. Pasar ${b(x.ex)} a ${dn(dj)} los empareja: quedan en ~${a1} y ~${b1} min, con las mismas series en la semana.${fit.length ? ` Tiene sentido ahí porque ${dn(dj)} ya trabaja esa zona (${lst(fit)}).` : ''}${!isIso(x.ex) ? ' Lo pongo antes de los ejercicios de aislamiento de ese día.' : ''}`
+        : c.type === 'shift' ? `${why0}. Pasar una serie de ${b(x.ex)} a ${b(c.ex2)}, en ${dn(dj)}, trabaja el mismo músculo (<b>${w.m}</b>), así que las series de la semana no cambian y los días quedan en ~${a1} y ~${b1} min.`
+        : `${dn(c.di)} dura ~${a0} min, más que tus otros días. Bajar una serie de ${b(x.ex)} lo acerca al resto (queda en ~${a1}) y ningún músculo queda debajo de su mínimo.`; break; }
     case 'exs': t = c.type === 'shift' ? `${b(x.ex)} tiene ${x.sets} series en ${dn(c.di)}. Pasadas ~${EXCAP} series del mismo ejercicio, el cansancio hace que cada serie extra rinda menos. Pasar ${w.k === 1 ? 'una serie' : w.k + ' series'} a ${b(c.ex2)}${c.dj !== c.di ? `, en ${dn(c.dj)},` : ''} mantiene las mismas series de <b>${w.m}</b> en la semana${c.dj !== c.di ? ' y las reparte mejor' : ''}.` : c.type === 'split' ? `${b(x.ex)} tiene ${x.sets} series en ${dn(c.di)}. Pasadas ~${EXCAP} series del mismo ejercicio, el cansancio hace que cada serie extra rinda menos. Dejarlo en ${x.sets - w.k} y hacer ${w.k} de ${b(c.to)}${c.dj !== c.di ? ` en ${dn(c.dj)}` : ''} mantiene las mismas series de <b>${w.m}</b>${PTc(c.to) !== PTc(x.ex) ? `, y además suma ${PATN[PTc(c.to)].toLowerCase()}` : ', con un estímulo un poco distinto'}.` : `${b(x.ex)} tiene ${x.sets} series en ${dn(c.di)}; pasadas ~${EXCAP} del mismo ejercicio cada serie extra rinde menos, y <b>${w.m}</b> sigue dentro de su objetivo sin ellas.`; break;
     case 'bal': { const p = E.parts['bal:' + w.nm]; t = `Hacés ${p.push} series de empuje ${w.nm} y ${p.pull} de tracción. Mantenerlos parejos es práctica habitual para cuidar los hombros y la postura. Sumarle una serie a ${b(x.ex)} los acerca.`; break; }
   }
   // Efectos en el resto del plan
-  const mainK = w.kind === 'exs' ? 'exs:' + c.iid : w.kind === 'fn' ? `fn:${w.m}:${w.qi}` : w.kind === 'dur' ? 'dur:' + w.di : w.kind === 'bal' ? 'bal:' + w.nm : w.kind === 'ses' ? `ses:${w.m}:${w.di}` : (w.kind === 'vol' || w.kind === 'swap' ? (E.parts['zero:' + w.m] ? 'zero:' : 'vol:') : w.kind + ':') + w.m;
+  const mainK = w.kind === 'bald' ? w.sub + ':' + w.di : w.kind === 'exs' ? 'exs:' + c.iid : w.kind === 'fn' ? `fn:${w.m}:${w.qi}` : w.kind === 'dur' ? 'dur:' + w.di : w.kind === 'bal' ? 'bal:' + w.nm : w.kind === 'ses' ? `ses:${w.m}:${w.di}` : (w.kind === 'vol' || w.kind === 'swap' ? (E.parts['zero:' + w.m] ? 'zero:' : 'vol:') : w.kind + ':') + w.m;
   const better = [], worse = [];
   new Set([...Object.keys(E.parts), ...Object.keys(e2.parts)]).forEach(k => { if (k === mainK || k.startsWith('dup:')) return; const a = E.parts[k], z = e2.parts[k], va = a ? a.v : 0, vz = z ? z.v : 0;
-    if (va - vz > .02) better.push({ d: (va - vz) * T_W[a.t], s: z ? partText(z, Q).replace(/^(<b>[^<]*<\/b>):/, '$1 mejora:') : solved(a, P) });
+    const dayK = ['bald', 'balc', 'bali', 'dur'].includes((a || z).kind), touches = dayK && [c.di, c.dj].includes((a || z).di);
+    if (dayK && !touches) return;
+    const part = z && dayK ? ({ bald: `<b>${esc(Q.days[z.di].name)}</b> se acerca al resto: ~${z.min} min (promedio ~${z.avg}).`, balc: `<b>${esc(Q.days[z.di].name)}</b> baja a ${z.n} ejercicios (promedio ${fmtNum(z.avg).replace('.', ',')}).`, bali: `<b>${esc(Q.days[z.di].name)}</b> queda con menos ejercicios pesados.`, dur: `<b>${esc(Q.days[z.di].name)}</b> se acorta a ~${z.min} min.` })[z.kind] : null;
+    if (va - vz > .02) better.push({ d: (va - vz) * T_W[a.t], s: part || (z ? partText(z, Q).replace(/^(<b>[^<]*<\/b>):/, '$1 mejora:') : solved(a, P)) });
     else if (vz - va > .02) worse.push({ d: (vz - va) * T_W[z.t], s: partText(z, Q) }); });
   const checks = [];
   if (!Object.keys(e2.parts).some(k => (k.startsWith('vol:') || k.startsWith('zero:')) && e2.parts[k].v > ((E.parts[k] || {}).v || 0) + .001)) checks.push(c.type === 'sets' && c.n > 0 || c.type === 'add' ? 'No le saca series a ningún músculo.' : 'Ningún músculo queda debajo de su mínimo.');
@@ -1756,12 +1783,12 @@ function analyzePlan() {
     // Es una carencia real, una mejora o algo opcional
     const lv = mp => mp.t === 0 || mp.kind === 'zero' || (mp.kind === 'vol' && (mp.lo - mp.V) / mp.lo >= .25) ? 3 : mp.t === 3 || mp.kind === 'bal' || (mp.kind === 'fn' && REQ[mp.m][mp.qi].opt) ? 1 : 2;
     const lmax = Object.values(E.parts).reduce((a, mp) => { const z = best.e2.parts[mp.k]; return mp.v - (z ? z.v : 0) > .02 ? Math.max(a, lv(mp)) : a; }, E.parts[ex.mk] ? lv(E.parts[ex.mk]) : 1), level = ['', 'opt', 'mej', 'imp'][lmax];
-    const cat = { exs: 'Distribución', vol: 'Volumen', swap: 'Volumen', volhi: 'Volumen', fn: 'Funciones', freq: 'Frecuencia', dur: 'Duración', ses: 'Distribución', bal: 'Equilibrio' }[w.kind] || 'Plan';
+    const cat = { bald: 'Días parejos', exs: 'Distribución', vol: 'Volumen', swap: 'Volumen', volhi: 'Volumen', fn: 'Funciones', freq: 'Frecuencia', dur: 'Duración', ses: 'Distribución', bal: 'Equilibrio' }[w.kind] || 'Plan';
     const nx = best.type === 'split' ? best.Q.days[best.dj].items.slice(-1)[0] : best.type === 'add' ? best.Q.days[best.di].items.slice(-1)[0] : best.type === 'rep' ? best.Q.days[best.di].items[best.ii] : null;
     const mD = dMin(best.Q.days[best.di]) - dMin(d);
     recs.push(Object.assign({ iid2: best.iid2, ex2: best.ex2, drid: best.dj != null ? P.days[best.dj].rid : null, op: { type: best.type, iid2: best.iid2, drid: best.dj != null ? P.days[best.dj].rid : null, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: nx ? nx.sets : null, rest: nx ? nx.rest : null },
       key: best.key, type: best.type, cat, level, ex0: x ? x.ex : null, title, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: nx ? nx.sets : null, gain: best.gain, srcs,
-      dur: (best.type === 'mov' || best.type === 'split') && best.dj !== best.di ? `${dn} ${mD > 0 ? '+' : '−'}${Math.abs(mD)} min · ${esc(P.days[best.dj].name)} +${dMin(best.Q.days[best.dj]) - dMin(P.days[best.dj])} min` : mD ? `${dn}: ${mD > 0 ? '+' : '−'}${Math.abs(mD)} min (queda en ~${dMin(best.Q.days[best.di])})` : 'No cambia la duración' }, ex));
+      dur: (best.type === 'mov' || best.type === 'split' || best.type === 'shift') && best.dj != null && best.dj !== best.di ? `${dn} ${mD > 0 ? '+' : '−'}${Math.abs(mD)} min · ${esc(P.days[best.dj].name)} +${dMin(best.Q.days[best.dj]) - dMin(P.days[best.dj])} min` : mD ? `${dn}: ${mD > 0 ? '+' : '−'}${Math.abs(mD)} min (queda en ~${dMin(best.Q.days[best.di])})` : 'No cambia la duración' }, ex));
     if (best.iid2) X.locked.add(best.iid2);
     if (x) X.locked.add(x.iid); if (best.type === 'add' || best.type === 'split') X.locked.add('new' + best.to);
     P = best.Q; E = best.e2;
@@ -1770,6 +1797,8 @@ function analyzePlan() {
   const res = { recs, issues, P0, E0, after: E, score0: planScore(E0.total), score1: planScore(E.total) };
   _anMemo = { sig, res }; return res;
 }
+// Dónde ubicar un ejercicio que llega a un día: los pesados antes del primer ejercicio de aislamiento
+const insAt = (items, exId) => { if (isIso(exId)) return items.length; const k = items.findIndex(y => isIso(y.exerciseId || y.ex)); return k < 0 ? items.length : k; };
 function applyRec(rec) {
     const R1 = S.routines.find(r => r.id === rec.rid); if (!R1) return null;
     const vals = id => { const f = R1.phaseId && findPhase(R1.phaseId); return f ? tplVals(tplOf(f.ph), f.ph.type, id) : null; };
@@ -1779,7 +1808,7 @@ function applyRec(rec) {
     else if (rec.type === 'add') { const f0 = R1.items[0] || {}, v = vals(rec.to) || {};
       R1.items.push(Object.assign({ id: uid(), exerciseId: rec.to, repMin: f0.repMin || 8, repMax: f0.repMax || 12, rest: f0.rest || S.settings.rest, notes: '', pct: null, rir: f0.rir ?? null }, v, { sets: rec.sets || 3 })); msg = `Agregado a ${R1.name}`; }
     else if (rec.type === 'del' && it) { R1.items.splice(i, 1); msg = `${exn(it.exerciseId)} sacado de ${R1.name}`; }
-    else if (rec.type === 'mov' && it) { const R2 = S.routines.find(r => r.id === rec.to); if (!R2) return null; R1.items.splice(i, 1); it.ss = false; R2.items.push(it); touch(R2); msg = `Movido a ${R2.name}`; }
+    else if (rec.type === 'mov' && it) { const R2 = S.routines.find(r => r.id === rec.to); if (!R2) return null; R1.items.splice(i, 1); it.ss = false; R2.items.splice(insAt(R2.items, it.exerciseId), 0, it); touch(R2); msg = `Movido a ${R2.name}`; }
     else if (rec.type === 'shift' && it) { const R2 = S.routines.find(r => r.id === rec.drid) || R1, z = R2.items.find(y => y.id === rec.iid2); if (!z) return null;
       it.sets = Math.max(1, it.sets + rec.n); z.sets += rec.sets; if (R2 !== R1) touch(R2); msg = `${exn(it.exerciseId)}: ${it.sets} series · ${exn(z.exerciseId)}: ${z.sets}`; }
     else if (rec.type === 'split' && it) { const R2 = S.routines.find(r => r.id === rec.drid) || R1, v = vals(rec.to) || {};
@@ -1797,7 +1826,7 @@ function applyOp(Q, op, no, mk) {
   if (!x) return;
   if (op.type === 'rep') { mk.it[x.iid] = { k: 'rep', no, from: x.ex }; x.ex = op.to; if (op.rest) x.rest = op.rest; }
   else if (op.type === 'del') { d.items.splice(i, 1); (mk.gone[d.rid] = mk.gone[d.rid] || []).push({ ex: x.ex, sets: x.sets, no }); }
-  else if (op.type === 'mov') { const d2 = Q.days.find(z => z.rid === op.to); if (!d2) return; d.items.splice(i, 1); d2.items.push(x); (mk.gone[d.rid] = mk.gone[d.rid] || []).push({ ex: x.ex, sets: x.sets, no, to: d2.name }); mk.it[x.iid] = { k: 'mov', no, from: d.name }; }
+  else if (op.type === 'mov') { const d2 = Q.days.find(z => z.rid === op.to); if (!d2) return; d.items.splice(i, 1); d2.items.splice(insAt(d2.items, x.ex), 0, x); (mk.gone[d.rid] = mk.gone[d.rid] || []).push({ ex: x.ex, sets: x.sets, no, to: d2.name }); mk.it[x.iid] = { k: 'mov', no, from: d.name }; }
   else if (op.type === 'shift') { const d2 = Q.days.find(z => z.rid === op.drid) || d, z = d2.items.find(y => y.iid === op.iid2); if (!z) return;
     [[x, op.n], [z, op.sets]].forEach(([y, n]) => { const m0 = mk.it[y.iid]; mk.it[y.iid] = Object.assign({}, m0 || { k: 'sets', no }, { s0: m0 && m0.s0 != null ? m0.s0 : y.sets }); y.sets += n; }); }
   else if (op.type === 'split') { const d2 = Q.days.find(z => z.rid === op.drid) || d, m0 = mk.it[x.iid]; mk.it[x.iid] = Object.assign({}, m0 || { k: 'sets', no }, { s0: m0 && m0.s0 != null ? m0.s0 : x.sets }); x.sets += op.n;
@@ -1842,7 +1871,7 @@ function vAnalysis() {
   if (recs.length && anTab === 'prev') return h + vPreview(A0);
   if (!recs.length) h += `<h2>Sugerencias</h2><div class="card row">${ico('shield')}<div class="sp"><div class="t" style="font-size:16px">No encontré cambios que convengan</div><div class="mu sm">Todo lo que se podría mejorar empeoraría otra cosa más importante, o te pasaría de tu tiempo por sesión.</div></div></div>`;
   else h += `<p class="mu sm" style="margin-top:-4px">Ordenadas de más a menos importante. Cada una se calculó teniendo en cuenta las anteriores; en <b>Cómo quedaría</b> ves la rutina con los cambios antes de decidir.</p>`;
-  const CI = { Volumen: ['bars', 'pink'], Funciones: ['target', ''], Frecuencia: ['calx', 'blue'], Distribución: ['bars', 'blue'], Duración: ['clock', 'orange'], Equilibrio: ['compare', 'blue'], Plan: ['target', ''] };
+  const CI = { 'Días parejos': ['calx', 'gold'], Volumen: ['bars', 'pink'], Funciones: ['target', ''], Frecuencia: ['calx', 'blue'], Distribución: ['bars', 'blue'], Duración: ['clock', 'orange'], Equilibrio: ['compare', 'blue'], Plan: ['target', ''] };
   recs.forEach((r, i) => {
     h += `<div class="card rec"><div class="row" style="align-items:flex-start;gap:12px">${ico(...(CI[r.cat] || CI.Plan))}<div class="sp"><div class="kicker" style="font-size:11.5px">${i + 1} · ${r.cat} <span class="lvl ${r.level}">${{ imp: 'Importante', mej: 'Mejora', opt: 'Opcional' }[r.level]}</span></div>
       <div class="t" style="font-size:16px;margin-top:3px;font-weight:600">${r.title}</div><div class="mu sm" style="margin-top:3px">${r.dur}</div></div></div>
@@ -1878,7 +1907,7 @@ function vAnalysis() {
     <p class="mu sm">Cuenta cada serie según tus repeticiones, los descansos que tenés puestos, el cambio entre ejercicios, series de aproximación en los multiarticulares y 5 minutos de entrada en calor.${cal.n ? ` Se ajusta con lo que duraron de verdad tus últimas ${cal.n} sesiones${Math.abs(cal.g - 1) >= .05 ? ` (en general entrenás un ${Math.round(Math.abs(cal.g - 1) * 100)}% ${cal.g > 1 ? 'más lento' : 'más rápido'} que la estimación)` : ''}.` : ' Cuando completes sesiones de tu plan, se va a ajustar a lo que tardás de verdad.'}</p>`;
   h += `<h2>Cómo decide</h2><div class="card sm" style="line-height:1.55">
     <p style="margin-top:0"><b>1. Mira la semana entera.</b> Para cada músculo cuenta las series (enteras si es el principal del ejercicio, la mitad si es secundario, que es la forma de contar que mejor predice el crecimiento), en cuántos días se entrena, qué tipos de movimiento recibe y cuánto dura cada día. Las series que planeás lejos del fallo (4 o más repeticiones en reserva) cuentan menos. Analiza una semana normal de tu fase, nunca la de descarga.</p>
-    <p><b>2. Ordena los problemas por importancia,</b> como un entrenador: primero lo estructural (un músculo sin trabajo, un músculo grande entrenado un solo día, días más largos que tu tiempo), después el volumen de cada músculo, después sus funciones y al final detalles de eficiencia.</p>
+    <p><b>2. Ordena los problemas por importancia,</b> como un entrenador: primero lo estructural (un músculo sin trabajo, un músculo grande entrenado un solo día, días más largos que tu tiempo), después el volumen de cada músculo, después sus funciones y que los días queden parejos (duración, cantidad de ejercicios y ejercicios pesados), y al final detalles de eficiencia. Para emparejar días mueve ejercicios o pasa series entre ejercicios del mismo músculo, solo a días que ya trabajan esa zona del cuerpo.</p>
     <p><b>3. Busca el arreglo menos invasivo.</b> Primero sumar o bajar series de lo que ya hacés, hasta 4 por ejercicio (lo habitual es 2 a 4: más series del mismo ejercicio rinden cada vez menos por el cansancio); después cambiar un ejercicio por otro del mismo músculo o pasarlo de día; y solo si hace falta, agregar o sacar. Un ejercicio nuevo solo se propone si trae algo que tu plan no tiene: otro tipo de movimiento para ese músculo, o un día más de trabajo. Para elegir cuál cambiar, busca el que más se parece a otro que ya tenés; para elegir por cuál, prefiere ejercicios que ya hiciste, tus favoritos, los del mismo equipo y los que aportan algo distinto.</p>
     <p style="margin-bottom:0"><b>4. Prueba cada cambio sobre todo el plan</b> y lo descarta si empeora algo más importante: nunca deja un músculo debajo de su mínimo, nunca rompe una función que ya tenías cubierta, nunca te pasa de tu tiempo por sesión y sube el volumen de a poco (como mucho +50% por músculo de una vez). Respeta tus objetivos y prioridades de cada músculo (en Progreso → Series por músculo) y tus preferencias: los ejercicios que no querés hacer y los que no querés que toque.</p>
     <p style="margin-bottom:0"><b>Cada sugerencia dice qué tan importante es:</b> <span class="lvl imp">Importante</span> es una carencia real, <span class="lvl mej">Mejora</span> es una oportunidad y <span class="lvl opt">Opcional</span> es un detalle: no todo lo que se puede mejorar hace falta cambiarlo.</p></div>`;
