@@ -567,6 +567,9 @@ b.warn{color:#ffb347}
 .pvrow[class*=pv-] .pvno{background:var(--s3)}.pvrow.pv-add .pvno,.pvrow.pv-rep .pvno{background:var(--ac);color:#111}.pvrow.pv-del .pvno{background:#ff6b6b;color:#111}.pvrow.pv-mov .pvno,.pvrow.pv-sets .pvno{background:#6aa8ff;color:#111}
 .pvname{font-weight:600}.pv-add .pvname,.pv-rep .pvname{color:var(--ac)}.pvold{text-decoration:line-through;color:var(--mu);font-size:14px}.pv-del .pvold{font-size:15px}
 .pvv{min-width:34px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;padding:2px 6px;border-radius:8px}.pvv.ok{color:var(--ac)}.pvv.lo{color:#ffb347}.pvv.hi{color:#ff6b6b}
+.lvl{display:inline-block;font-size:10.5px;letter-spacing:.04em;padding:2px 7px;border-radius:99px;margin-left:4px;vertical-align:1px;font-weight:700}
+.lvl.imp{background:rgba(255,107,107,.16);color:#ff8a8a}.lvl.mej{background:rgba(190,242,100,.14);color:var(--ac)}.lvl.opt{background:var(--s3);color:var(--mu)}
+.prefl{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}.prefl button{background:none;padding:4px 0;font-size:13px;color:var(--mu);text-decoration:underline;text-underline-offset:3px}
 </style>
 </head>
 <body>
@@ -587,7 +590,7 @@ b.warn{color:#ffb347}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '8.3';
+const KEY = 'entreno.v1', VERSION = '8.4';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1485,7 +1488,10 @@ const ASRC = { 1: ['Squat vs extensión de cuádriceps (J Sports Sci, 2021)', 'h
   9: ['Kassiano et al., 2025: curl inclinado vs predicador', 'https://sci-sport.com/en/effects-of-incline-and-preacher-curls-on-regional-hypertrophy-and-strength-266/'], 10: ['Kinoshita et al., 2023: gemelos de pie vs sentado', 'https://barbend.com/new-study-standing-vs-seated-calf-raises'],
   11: ['Kassiano et al., 2022: variar ejercicios', 'https://pubmed.ncbi.nlm.nih.gov/35438660/'], 12: ['Remmert et al., 2025: series por sesión', 'https://www.eurekalert.org/news-releases/1086804'],
   13: ['Schoenfeld et al., 2016: frecuencia', 'https://pubmed.ncbi.nlm.nih.gov/27102172/'], 14: ['Singer et al., 2024: descansos', 'https://doaj.org/article/18363f4031e0487793db2084bee23f38'],
-  15: ['Schoenfeld et al., 2017: series por semana y crecimiento', 'https://pubmed.ncbi.nlm.nih.gov/27433992/'] };
+  15: ['Schoenfeld et al., 2017: series por semana y crecimiento', 'https://pubmed.ncbi.nlm.nih.gov/27433992/'],
+  16: ['Pelland, Zourdos et al., 2024: dosis-respuesta y series indirectas', 'https://sportrxiv.org/index.php/server/preprint/view/460'],
+  17: ['ACSM, 2026: guía de prescripción del entrenamiento de fuerza', 'https://www.eurekalert.org/news-releases/1119943'],
+  18: ['Bernárdez-Vázquez et al., 2022: variables del entrenamiento (revisión paraguas)', 'https://www.frontiersin.org/journals/sports-and-active-living/articles/10.3389/fspor.2022.949021/full'] };
 // Minutos estimados de un día: series × (trabajo + descanso) + preparación de cada ejercicio + entrada en calor
 // ===== Análisis del plan =====
 // Trabaja como un entrenador, en 4 pasos:
@@ -1511,7 +1517,21 @@ const med = a => { const b = [...a].sort((x, y) => x - y), n = b.length; return 
 // + cambio al siguiente ejercicio + preparación; los multiarticulares suman series de aproximación.
 function itemSec(x) { const e = exById(x.ex) || {}, w = Math.max(20, (x.reps || 10) * 3.5) * (e.unilateral ? 2 : 1);
   return x.sets * w + Math.max(0, x.sets - 1) * x.rest + Math.min(x.rest, 120) * .5 + 60 + (isIso(x.ex) ? 0 : 90); }
-const dayEst = d => (d.items.reduce((a, x) => a + itemSec(x), 0) + 300) / 60;
+// En una superserie no se descansa entre los dos ejercicios: el descanso del primero se ahorra
+const dayEst = d => (d.items.reduce((a, x) => a + itemSec(x) - (x.ss ? Math.max(0, x.sets - 1) * x.rest : 0), 0) + 300) / 60;
+// Series efectivas: una serie lejos del fallo (RIR 4 o más) estimula menos que una cerca (Robinson 2024)
+const effW = x => x.rir == null || x.rir <= 3 ? 1 : x.rir === 4 ? .75 : .5;
+// Perfil de longitud: en qué posición del recorrido el músculo trabaja más cargado
+const PLEN = { hinge: 'long', hipExt: 'short', ohTri: 'long', curlLong: 'long', curlShort: 'long', fly: 'long', calfStr: 'long', lunge: 'long', squat: 'long', pullover: 'long', rear: 'short', shrug: 'short' };
+const LENX = { 'curl femoral sentado': 'long', 'patada de triceps': 'short', 'patada de gluteo en polea': 'short', 'elevacion de talones de pie': 'long', 'prensa de piernas': 'mid', 'press en maquina': 'mid', 'cruces en polea': 'mid', 'pec deck': 'mid' };
+const lenOf = id => LENX[norm((exById(id) || {}).name || '')] || PLEN[PTc(id)] || 'mid';
+const LENN = { long: 'más cargado con el músculo estirado', mid: 'carga pareja en el recorrido', short: 'más cargado con el músculo contraído' };
+// Qué tan parecidos son dos ejercicios (0 a 1): músculos que trabajan y cuánto, tipo de movimiento, perfil de longitud y equipo.
+// Es una estimación, no una verdad fisiológica: dos ejercicios parecidos pueden estar bien si suman volumen que hace falta.
+function exSim(a, b) { const k = a < b ? a + '|' + b : b + '|' + a; if (_mc['s' + k] != null) return _mc['s' + k];
+  const A = MMc(a), B = MMc(b); let dot = 0, na = 0, nb = 0; new Set([...Object.keys(A), ...Object.keys(B)]).forEach(m => { const x = A[m] || 0, y = B[m] || 0; dot += x * y; na += x * x; nb += y * y; });
+  const v = (na && nb ? dot / Math.sqrt(na * nb) : 0) * .5 + (PTc(a) === PTc(b) ? .3 : 0) + (lenOf(a) === lenOf(b) ? .1 : 0) + (exInfo(exById(a)).eq === exInfo(exById(b)).eq ? .1 : 0);
+  return _mc['s' + k] = v; }
 const dMin = d => Math.round(dayEst(d) * (d.k || 1));
 // Ajuste con tus sesiones reales: compara lo que duraron tus últimos entrenamientos de cada día con la estimación
 function timeCal(P) {
@@ -1524,8 +1544,9 @@ function timeCal(P) {
   P.days.forEach(d => d.k = cl(by[d.rid] || g)); P.cal = { n: all.length, g: cl(g), real: P.days.map(d => !!by[d.rid]) };
 }
 function planModel() {
-  const c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1;
-  const P = { days: planDays().map(r => ({ rid: r.id, name: r.name, items: r.items.map(it => { const p = prescribe(it, ph, w); return { iid: it.id, ex: it.exerciseId, sets: p.sets, rest: +p.rest || S.settings.rest, reps: ((+p.repMin || 8) + (+p.repMax || +p.repMin || 12)) / 2 }; }) })) };
+  // Se analiza una semana normal del plan (nunca la de descarga, que a propósito tiene menos series)
+  const P = { days: planDays().map(r => ({ rid: r.id, name: r.name, items: r.items.map((it, k) => ({ iid: it.id, ex: it.exerciseId, sets: Math.max(1, +it.sets || 3), rest: +it.rest || S.settings.rest,
+    reps: ((+it.repMin || 8) + (+it.repMax || +it.repMin || 12)) / 2, rir: it.rir === '' || it.rir == null ? null : +it.rir, ss: !!it.ss && k < r.items.length - 1 })) })) };
   timeCal(P); return P;
 }
 const cloneP = P => ({ cal: P.cal, days: P.days.map(d => ({ ...d, items: d.items.map(x => ({ ...x })) })) });
@@ -1533,7 +1554,7 @@ function evalPlan(P) {
   const parts = {}, put = (k, t, v, info) => { if (v > .004) parts[k] = Object.assign({ k, t, v }, info); };
   const nd = P.days.length, mus = {}, lim = anLim();
   P.days.forEach((d, di) => d.items.forEach(x => { const mm = MMc(x.ex), pt = PTc(x.ex);
-    for (const m in mm) { const o = mus[m] || (mus[m] = { V: 0, dayV: Array(nd).fill(0), dd: Array(nd).fill(false), pat: {} }); const v = x.sets * mm[m];
+    for (const m in mm) { const o = mus[m] || (mus[m] = { V: 0, dayV: Array(nd).fill(0), dd: Array(nd).fill(false), pat: {} }); const v = x.sets * mm[m] * effW(x);
       o.V += v; o.dayV[di] += v; if (mm[m] >= 1) o.dd[di] = true; o.pat[pt] = (o.pat[pt] || 0) + v; } }));
   const gDays = g => P.days.filter(d => d.items.some(x => exGrp(x.ex) === g)).length;
   AM.forEach(([m]) => { const rg = MRANGE(m); if (!rg) return;
@@ -1564,12 +1585,14 @@ function genCands(P, E, X) {
   P.days.forEach((d, di) => d.items.forEach((x, ii) => items.push({ d, di, ii, x })));
   const used = new Set(items.map(o => o.x.ex)), mainOf = m => items.filter(o => isMain(o.x.ex, m)), patsOf = m => new Set(mainOf(m).map(o => PTc(o.x.ex)));
   const head = d => lim - dMin(d), fitsG = (d, g) => g === 'core' || d.items.some(x => exGrp(x.ex) === g), cap = id => isIso(id) ? 5 : 4;
-  const eqOf = id => exInfo(exById(id)).eq;
+  const eqOf = id => exInfo(exById(id)).eq, keep = new Set(S.settings.anKeep || []);
+  const simIn = (id, m, not) => items.reduce((a, o) => o.x !== not && isMain(o.x.ex, m) ? Math.max(a, exSim(id, o.x.ex)) : a, 0);
   // Qué ejercicio elegir: primero los que ya hiciste antes, tus favoritos y los del mismo equipo que el que se cambia
   const pick = (m, pats, like) => X.lib.filter(e => !used.has(e.id) && isMain(e.id, m) && pats.includes(PTc(e.id)))
-    .map(e => ({ id: e.id, sc: Math.min(X.hist[e.id] || 0, 6) + (e.fav ? 4 : 0) + (like && exInfo(e).eq === eqOf(like) ? 1.5 : 0) + (e.custom ? 1 : 0) }))
+    .map(e => ({ id: e.id, sc: Math.min(X.hist[e.id] || 0, 6) + (e.fav ? 4 : 0) + (like && exInfo(e).eq === eqOf(like) ? 1.5 : 0) + (e.custom ? 1 : 0) + (1 - simIn(e.id, m)) * 3 }))
     .sort((a, b) => b.sc - a.sc).slice(0, 2).map(o => o.id);
-  const push = c => { if (X.dis[c.key] || (c.iid && X.locked.has(c.iid)) || C.has(c.key)) return; C.set(c.key, c); };
+  const push = c => { if (X.dis[c.key] || (c.iid && X.locked.has(c.iid)) || C.has(c.key)) return;
+    if (c.iid && c.type !== 'sets' && keep.has((items.find(o => o.x.iid === c.iid) || { x: {} }).x.ex)) return; C.set(c.key, c); };
   const SETS = (o, n, why) => { if (o.x.sets + n < 2 || o.x.sets + n > cap(o.x.ex)) return; push({ type: 'sets', di: o.di, ii: o.ii, iid: o.x.iid, n, cost: .02 * Math.abs(n), key: `sets:${o.x.iid}:${o.x.sets + n}`, why, f: Q => { Q.days[o.di].items[o.ii].sets += n; } }); };
   const REP = (o, to, why, cost) => { const v = X.tv(o.d, to); push({ type: 'rep', di: o.di, ii: o.ii, iid: o.x.iid, to, cost, key: `rep:${o.x.iid}:${to}`, why, f: Q => Object.assign(Q.days[o.di].items[o.ii], { ex: to, rest: v.rest, reps: v.reps }) }); };
   const ADD = (di, to, why) => { const d = P.days[di], v = X.tv(d, to), sets = Math.min(v.sets, head(d) >= 10 ? 3 : 2); push({ type: 'add', di, to, sets, cost: .25, key: `add:${d.rid}:${to}`, why, f: Q => Q.days[di].items.push({ iid: 'new' + to, ex: to, sets, rest: v.rest, reps: v.reps }) }); };
@@ -1597,8 +1620,9 @@ function genCands(P, E, X) {
       // Reemplazar un ejercicio del mismo músculo que no sea lo único que cubre otra de sus funciones
       L.forEach(o => { const pt = PTc(o.x.ex); if (q.any.includes(pt)) return;
         const sole = (REQ[m] || []).some(q2 => q2 !== q && q2.any.includes(pt) && L.filter(z => q2.any.includes(PTc(z.x.ex))).length <= 1); if (sole) return;
-        const dupl = L.filter(z => PTc(z.x.ex) === pt).length >= 2;
-        pick(m, q.any, o.x.ex).forEach(id => REP(o, id, { kind: 'fn', m, qi: p.qi, dupl }, dupl ? .04 : .07)); });
+        // cuanto más se parece a otro ejercicio que ya tenés, mejor candidato es para cambiar
+        const tw = L.filter(z => z !== o).map(z => ({ z, s: exSim(o.x.ex, z.x.ex) })).sort((a, b) => b.s - a.s)[0];
+        pick(m, q.any, o.x.ex).forEach(id => REP(o, id, { kind: 'fn', m, qi: p.qi, sim: tw ? tw.s : 0, twin: tw ? tw.z.x.ex : null, tdi: tw ? tw.z.di : null }, .03 + .08 * (1 - (tw ? tw.s : 0)))); });
       P.days.forEach((d, di) => { if (head(d) >= 7 && fitsG(d, GRP(m))) pick(m, q.any).forEach(id => ADD(di, id, { kind: 'fn', m, qi: p.qi })); });
     }
     if (p.kind === 'freq') { const dd = (E.mus[m] || {}).dd || [];
@@ -1618,7 +1642,9 @@ function genCands(P, E, X) {
   return [...C.values()];
 }
 // Lo que un cambio nunca puede hacer, aunque mejore otra cosa
-function allowed(E, e2) {
+function allowed(E, e2, E0) {
+  // Subir el volumen de a poco: como mucho +50% (o +4 series) por músculo respecto de lo que hacés hoy
+  for (const m in e2.mus) { const a = (E0.mus[m] || {}).V || 0, b = e2.mus[m].V; if (b > Math.max(a * 1.5, a + 4) + .01 && b > ((E.mus[m] || {}).V || 0) + .01) return false; }
   const fixesStruct = E.tier[0] - e2.tier[0] > .01;
   if (e2.tier[0] > E.tier[0] + .001) return false;
   for (const k in e2.parts) { const a = E.parts[k], b = e2.parts[k];
@@ -1645,6 +1671,9 @@ function partText(p, P) {
 function solved(p, P) { const dn = di => esc((P.days[di] || {}).name || '');
   return { zero: `<b>${p.m}</b> pasa a tener trabajo.`, vol: `<b>${p.m}</b> llega a su objetivo de series.`, volhi: `<b>${p.m}</b> vuelve a su rango de series.`, freq: `<b>${p.m}</b> pasa a entrenarse 2 días por semana.`,
     ses: `<b>${p.m}</b> ya no se pasa de series en ${dn(p.di)}.`, fn: p.kind === 'fn' ? `<b>${p.m}</b> ya cubre ${REQ[p.m][p.qi].label.toLowerCase()}.` : '', dur: `<b>${dn(p.di)}</b> entra en tu tiempo disponible.`, bal: `Empuje y tracción ${p.nm} quedan parejos.` }[p.kind] || ''; }
+function simWhy(a, b) { const r = []; const A = MMc(a), B = MMc(b), sh = Object.keys(A).filter(m => A[m] >= 1 && (B[m] || 0) >= 1);
+  if (sh.length) r.push('mismo músculo principal'); if (PTc(a) === PTc(b)) r.push('mismo movimiento'); if (lenOf(a) === lenOf(b)) r.push('mismo perfil de carga'); if (exInfo(exById(a)).eq === exInfo(exById(b)).eq) r.push('mismo equipo');
+  return r.join(', ') || 'músculos parecidos'; }
 // Explica un cambio con el contexto de todo el plan
 function explain(c, P, E, Q, e2) {
   const w = c.why, d = P.days[c.di], x = c.ii != null ? d.items[c.ii] : null, nm = id => esc((exById(id) || {}).name || ''), b = id => `<b>${nm(id)}</b>`, dn = di => esc(P.days[di].name);
@@ -1660,7 +1689,7 @@ function explain(c, P, E, Q, e2) {
     case 'fn': { const q = REQ[w.m][w.qi], sh = Math.round((((E.parts[`fn:${w.m}:${w.qi}`] || {}).share) || 0) * 100);
       const head = `<b>${w.m}</b>: de sus ${V0(w.m)} series por semana, ${sh ? `solo el ${sh}%` : 'ninguna'} ${sh ? 'corresponde a' : 'es de'} ${q.label.toLowerCase()} (conviene ~25% o más). ${q.why}`;
       if (c.type === 'rep') { const same = all.filter(y => y !== x && isMain(y.ex, w.m) && PTc(y.ex) === PTc(x.ex)).map(y => nm(y.ex)), rest = all.filter(y => y !== x && (MMc(y.ex)[w.m] || 0) > 0).map(y => nm(y.ex)).slice(0, 3);
-        t = `${head}<br><br>Elegí cambiar ${b(x.ex)} porque ${w.dupl && same.length ? `${lst(same)} ya ${same.length > 1 ? 'hacen' : 'hace'} el mismo movimiento (${PATN[PTc(x.ex)].toLowerCase()})` : rest.length ? `lo que aporta lo siguen cubriendo ${lst(rest)}` : 'es el que menos aporta algo propio'}. Mismo día y mismas series, así que no cambia la duración ni el volumen.`; }
+        t = `${head}<br><br>Elegí cambiar ${b(x.ex)} porque ${w.twin === x.ex ? `también lo hacés en ${dn(w.tdi)}, así que no lo perdés` : w.twin && w.sim >= .6 ? `se parece un ${Math.round(w.sim * 100)}% a ${b(w.twin)}, que ya tenés (${simWhy(x.ex, w.twin)})` : rest.length ? `lo que aporta lo siguen cubriendo ${lst(rest)}` : 'es el que menos aporta algo propio'}. Mismo día y mismas series, así que no cambia la duración ni el volumen.`; }
       else t = `${head}<br><br>Ningún ejercicio de ${w.m.toLowerCase()} que tenés se puede cambiar sin perder otra cosa, y ${dn(c.di)} tiene lugar: queda en ~${m1} min (tu límite es ${lim}).`;
       break; }
     case 'freq': t = `<b>${w.m}</b> se entrena de forma directa un solo día por semana. ${c.type === 'mov' ? `Pasando ${b(x.ex)} a ${dn(c.dj)} lo trabajás 2 días con las mismas series.` : `Sumando ${b(c.to)} en ${dn(c.di)} lo trabajás 2 días.`} Repartir las series de un músculo en 2 días rinde más que hacerlas todas juntas.`; break;
@@ -1677,20 +1706,21 @@ function explain(c, P, E, Q, e2) {
   const checks = [];
   if (!Object.keys(e2.parts).some(k => (k.startsWith('vol:') || k.startsWith('zero:')) && e2.parts[k].v > ((E.parts[k] || {}).v || 0) + .001)) checks.push(c.type === 'sets' && c.n > 0 || c.type === 'add' ? 'No le saca series a ningún músculo.' : 'Ningún músculo queda debajo de su mínimo.');
   if (m1 <= lim || c.type === 'mov') checks.push(c.type === 'mov' ? `${dn(c.di)} queda en ~${m1} min y ${dn(c.dj)} en ~${dMin(Q.days[c.dj])} (tu límite: ${lim}).` : `${dn(c.di)} queda en ~${m1} min (tu límite: ${lim}).`);
-  return { main: t, better: better.sort((a, z) => z.d - a.d).slice(0, 2).map(o => o.s), worse: worse.sort((a, z) => z.d - a.d).slice(0, 2).map(o => o.s), checks };
+  return { mk: mainK, main: t, better: better.sort((a, z) => z.d - a.d).slice(0, 2).map(o => o.s), worse: worse.sort((a, z) => z.d - a.d).slice(0, 2).map(o => o.s), checks };
 }
 let _anMemo = null, anTab = 'recs', anOff = new Set();
 function analyzePlan() {
-  const P0 = planModel(), sig = JSON.stringify([P0, S.settings.mt, S.settings.mprio, S.settings.anDis, S.settings.anMin, S.exercises.length, S.sessions.length]);
+  const P0 = planModel(), sig = JSON.stringify([P0, S.settings.mt, S.settings.mprio, S.settings.anDis, S.settings.anMin, S.settings.anNo, S.settings.anKeep, S.exercises.length, S.sessions.length]);
   if (_anMemo && _anMemo.sig === sig) return _anMemo.res;
   const hist = {}; S.sessions.forEach(s => (s.exercises || []).forEach(e => hist[e.exerciseId] = (hist[e.exerciseId] || 0) + 1));
-  const X = { dis: S.settings.anDis || {}, locked: new Set(), hist, lib: S.exercises.filter(e => !e.archived && PTc(e.id) !== 'other'),
+  const no = new Set(S.settings.anNo || []);
+  const X = { dis: S.settings.anDis || {}, locked: new Set(), hist, lib: S.exercises.filter(e => !e.archived && !no.has(e.id) && PTc(e.id) !== 'other'),
     tv: (d, ex) => { const r = S.routines.find(z => z.id === d.rid), f = r && r.phaseId && findPhase(r.phaseId), v = f ? tplVals(tplOf(f.ph), f.ph.type, ex) : null;
       return v ? { sets: v.sets, rest: v.rest, reps: (v.repMin + v.repMax) / 2 } : { sets: 3, rest: isIso(ex) ? 90 : S.settings.rest, reps: isIso(ex) ? 12 : 9 }; } };
   let P = cloneP(P0), E = evalPlan(P); const E0 = E, recs = [];
   for (let round = 0; round < 8; round++) {
     let best = null;
-    genCands(P, E, X).forEach(c => { const Q = cloneP(P); c.f(Q); const e2 = evalPlan(Q); if (!allowed(E, e2)) return; const gain = E.total - e2.total - c.cost;
+    genCands(P, E, X).forEach(c => { const Q = cloneP(P); c.f(Q); const e2 = evalPlan(Q); if (!allowed(E, e2, E0)) return; const gain = E.total - e2.total - c.cost;
       if (gain > .04 && (!best || gain > best.gain)) best = Object.assign(c, { gain, Q, e2 }); });
     if (!best) break;
     const d = P.days[best.di], x = best.ii != null ? d.items[best.ii] : null, exn = id => esc((exById(id) || {}).name || ''), dn = esc(d.name);
@@ -1698,12 +1728,15 @@ function analyzePlan() {
       : best.type === 'del' ? `Sacar <b>${exn(x.ex)}</b> de ${dn}` : best.type === 'mov' ? `Pasar <b>${exn(x.ex)}</b> de ${dn} a ${esc(P.days[best.dj].name)}`
       : `<b>${exn(x.ex)}</b>: de ${x.sets} a ${x.sets + best.n} series en ${dn}`;
     const w = best.why, ex = explain(best, P, E, best.Q, best.e2);
-    const srcs = w.kind === 'fn' ? [REQ[w.m][w.qi].src] : w.kind === 'ses' ? [12] : w.kind === 'freq' ? [13] : ['vol', 'swap', 'volhi'].includes(w.kind) ? [15] : [];
+    const srcs = w.kind === 'fn' ? [REQ[w.m][w.qi].src] : w.kind === 'ses' ? [12] : w.kind === 'freq' ? [13] : ['vol', 'swap', 'volhi'].includes(w.kind) ? [16, 17] : [];
+    // Es una carencia real, una mejora o algo opcional
+    const lv = mp => mp.t === 0 || mp.kind === 'zero' || (mp.kind === 'vol' && (mp.lo - mp.V) / mp.lo >= .25) ? 3 : mp.t === 3 || mp.kind === 'bal' || (mp.kind === 'fn' && REQ[mp.m][mp.qi].opt) ? 1 : 2;
+    const lmax = Object.values(E.parts).reduce((a, mp) => { const z = best.e2.parts[mp.k]; return mp.v - (z ? z.v : 0) > .02 ? Math.max(a, lv(mp)) : a; }, E.parts[ex.mk] ? lv(E.parts[ex.mk]) : 1), level = ['', 'opt', 'mej', 'imp'][lmax];
     const cat = { vol: 'Volumen', swap: 'Volumen', volhi: 'Volumen', fn: 'Funciones', freq: 'Frecuencia', dur: 'Duración', ses: 'Distribución', bal: 'Equilibrio' }[w.kind] || 'Plan';
     const nx = best.type === 'add' ? best.Q.days[best.di].items.slice(-1)[0] : best.type === 'rep' ? best.Q.days[best.di].items[best.ii] : null;
     const mD = dMin(best.Q.days[best.di]) - dMin(d);
     recs.push(Object.assign({ op: { type: best.type, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: nx ? nx.sets : null, rest: nx ? nx.rest : null },
-      key: best.key, type: best.type, cat, title, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: nx ? nx.sets : null, gain: best.gain, srcs,
+      key: best.key, type: best.type, cat, level, ex0: x ? x.ex : null, title, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: nx ? nx.sets : null, gain: best.gain, srcs,
       dur: best.type === 'mov' ? `${dn} ${mD > 0 ? '+' : '−'}${Math.abs(mD)} min · ${esc(P.days[best.dj].name)} +${dMin(best.Q.days[best.dj]) - dMin(P.days[best.dj])} min` : mD ? `${dn}: ${mD > 0 ? '+' : '−'}${Math.abs(mD)} min (queda en ~${dMin(best.Q.days[best.di])})` : 'No cambia la duración' }, ex));
     if (x) X.locked.add(x.iid); if (best.type === 'add') X.locked.add('new' + best.to);
     P = best.Q; E = best.e2;
@@ -1777,14 +1810,26 @@ function vAnalysis() {
   else h += `<p class="mu sm" style="margin-top:-4px">Ordenadas de más a menos importante. Cada una se calculó teniendo en cuenta las anteriores; en <b>Cómo quedaría</b> ves la rutina con los cambios antes de decidir.</p>`;
   const CI = { Volumen: ['bars', 'pink'], Funciones: ['target', ''], Frecuencia: ['calx', 'blue'], Distribución: ['bars', 'blue'], Duración: ['clock', 'orange'], Equilibrio: ['compare', 'blue'], Plan: ['target', ''] };
   recs.forEach((r, i) => {
-    h += `<div class="card rec"><div class="row" style="align-items:flex-start;gap:12px">${ico(...(CI[r.cat] || CI.Plan))}<div class="sp"><div class="kicker" style="font-size:11.5px">${i + 1} · ${r.cat}</div>
+    h += `<div class="card rec"><div class="row" style="align-items:flex-start;gap:12px">${ico(...(CI[r.cat] || CI.Plan))}<div class="sp"><div class="kicker" style="font-size:11.5px">${i + 1} · ${r.cat} <span class="lvl ${r.level}">${{ imp: 'Importante', mej: 'Mejora', opt: 'Opcional' }[r.level]}</span></div>
       <div class="t" style="font-size:16px;margin-top:3px;font-weight:600">${r.title}</div><div class="mu sm" style="margin-top:3px">${r.dur}</div></div></div>
       <div class="recwhy"><div class="mu sm" style="margin-bottom:6px">Por qué</div><div style="font-size:14px;line-height:1.5">${r.main}</div>
       ${r.better.length ? `<div class="mu sm" style="margin:10px 0 4px">Además</div>${r.better.map(t => `<div class="rb ok">${t}</div>`).join('')}` : ''}
       ${r.worse.length ? `<div class="mu sm" style="margin:10px 0 4px">A cambio</div>${r.worse.map(t => `<div class="rb no">${t}</div>`).join('')}` : ''}
       ${r.checks.length ? `<div style="margin-top:10px">${r.checks.map(t => `<div class="rb chk">${t}</div>`).join('')}</div>` : ''}</div>
       ${r.srcs.length ? `<div class="mu sm" style="margin-top:8px">Fuente: ${r.srcs.map(k => ASRC[k]).filter(Boolean).map(s => s[1] ? `<a href="${s[1]}" target="_blank" rel="noopener">${esc(s[0])}</a>` : esc(s[0])).join(' · ')}</div>` : ''}
-      <div class="row" style="gap:8px;margin-top:12px"><button class="pri sp" data-a="anApply" data-k="${esc(r.key)}">Aplicar</button><button class="ghost" data-a="anDismiss" data-k="${esc(r.key)}">Descartar</button></div></div>`; });
+      <div class="row" style="gap:8px;margin-top:12px"><button class="pri sp" data-a="anApply" data-k="${esc(r.key)}">Aplicar</button><button class="ghost" data-a="anDismiss" data-k="${esc(r.key)}">Descartar</button></div>
+      <div class="prefl">${(r.type === 'rep' || r.type === 'add') && r.to ? `<button data-a="anNo" data-id="${r.to}">No quiero hacer ${esc(exById(r.to).name)}</button>` : ''}${['rep', 'mov', 'del'].includes(r.type) && r.ex0 ? `<button data-a="anKeep" data-id="${r.ex0}">No toques ${esc(exById(r.ex0).name)}</button>` : ''}</div></div>`; });
+  { const no = (S.settings.anNo || []).filter(exById), kp = (S.settings.anKeep || []).filter(exById);
+    if (no.length || kp.length) h += `<h2>Tus preferencias</h2><div class="card sm">${kp.length ? `<div class="mu" style="margin-bottom:6px">No se tocan</div><div class="chips">${kp.map(id => `<button class="chip on" data-a="anKeepRm" data-id="${id}">${esc(exById(id).name)} ✕</button>`).join('')}</div>` : ''}
+      ${no.length ? `<div class="mu" style="margin:${kp.length ? 12 : 0}px 0 6px">No se sugieren</div><div class="chips">${no.map(id => `<button class="chip" data-a="anNoRm" data-id="${id}">${esc(exById(id).name)} ✕</button>`).join('')}</div>` : ''}
+      <p class="mu" style="margin:10px 0 0">Tocá uno para sacarlo de la lista.</p></div>`; }
+  // Ejercicios parecidos: no es un error, pero conviene saberlo
+  { const all = P0.days.flatMap((d, di) => d.items.map(x => ({ x, di }))), pairs = [];
+    all.forEach((a, i) => all.slice(i + 1).forEach(b2 => { const m = mainMus(a.x.ex); if (m !== mainMus(b2.x.ex)) return; const s2 = exSim(a.x.ex, b2.x.ex); if (s2 >= .75) pairs.push({ a, b: b2, s: s2, m }); }));
+    if (pairs.length) h += `<h2>Ejercicios parecidos</h2><div class="card" style="padding:4px 18px">${pairs.sort((p, q) => q.s - p.s).slice(0, 6).map(p => { const miss = (REQ[p.m] || []).find((q, qi) => E0.parts[`fn:${p.m}:${qi}`] && !q.opt), hi = E0.parts['volhi:' + p.m], same = p.a.x.ex === p.b.x.ex, dnm = di => esc(P0.days[di].name);
+      const v = hi ? `${p.m} se pasa de series: podrías sacar uno.` : miss && !same ? `A ${p.m.toLowerCase()} le ${(E0.parts[`fn:${p.m}:${REQ[p.m].indexOf(miss)}`] || {}).share > .01 ? 'falta más' : 'falta'} ${miss.label.toLowerCase()}: si querés sumarlo, uno de estos es el mejor candidato para cambiar.` : same ? `Está bien: repartís ese ejercicio en 2 días, que rinde más que hacer todas las series juntas.` : `Está bien: suman volumen que ${p.m.toLowerCase()} necesita${p.a.di !== p.b.di ? ' y lo reparten en 2 días' : ''}.`;
+      return `<div class="exrow" style="align-items:flex-start"><div class="sp"><div style="font-weight:600">${same ? `${esc(exById(p.a.x.ex).name)}</div><div class="mu sm">El mismo ejercicio en ${dnm(p.a.di)} y ${dnm(p.b.di)}` : `${esc(exById(p.a.x.ex).name)} · ${esc(exById(p.b.x.ex).name)}</div><div class="mu sm">${simWhy(p.a.x.ex, p.b.x.ex)}`}</div><div class="sm" style="margin-top:4px">${v}</div></div><b class="mu" style="font-variant-numeric:tabular-nums">${Math.round(p.s * 100)}%</b></div>`; }).join('')}</div>
+      <p class="mu sm">Dos ejercicios parecidos no son un error: sirven para sumar volumen o trabajar con distintas cargas. Solo conviene variar uno si a ese músculo le falta otra cosa.</p>`; }
   const rest = issues.filter(p => p.v > .03 && !recs.length || p.v > .03).slice(0, 8);
   if (rest.length) h += `<h2>Diagnóstico de tu plan actual</h2><div class="card sm" style="line-height:1.5">${rest.map(p => `<p style="margin:6px 0">${partText(p, P0)}</p>`).join('')}</div>
     <p class="mu sm">De lo más importante a lo menos. No todo tiene un arreglo que convenga: a veces corregir algo empeoraría otra cosa más importante.</p>`;
@@ -1798,10 +1843,11 @@ function vAnalysis() {
     <b class="${mins[di] > lim ? 'warn' : ''}">~${mins[di]} min</b></div>`).join('')}</div>
     <p class="mu sm">Cuenta cada serie según tus repeticiones, los descansos que tenés puestos, el cambio entre ejercicios, series de aproximación en los multiarticulares y 5 minutos de entrada en calor.${cal.n ? ` Se ajusta con lo que duraron de verdad tus últimas ${cal.n} sesiones${Math.abs(cal.g - 1) >= .05 ? ` (en general entrenás un ${Math.round(Math.abs(cal.g - 1) * 100)}% ${cal.g > 1 ? 'más lento' : 'más rápido'} que la estimación)` : ''}.` : ' Cuando completes sesiones de tu plan, se va a ajustar a lo que tardás de verdad.'}</p>`;
   h += `<h2>Cómo decide</h2><div class="card sm" style="line-height:1.55">
-    <p style="margin-top:0"><b>1. Mira la semana entera.</b> Para cada músculo cuenta las series (enteras si es el principal del ejercicio, la mitad si es secundario), en cuántos días se entrena, qué tipos de movimiento recibe y cuánto dura cada día.</p>
+    <p style="margin-top:0"><b>1. Mira la semana entera.</b> Para cada músculo cuenta las series (enteras si es el principal del ejercicio, la mitad si es secundario, que es la forma de contar que mejor predice el crecimiento), en cuántos días se entrena, qué tipos de movimiento recibe y cuánto dura cada día. Las series que planeás lejos del fallo (4 o más repeticiones en reserva) cuentan menos. Analiza una semana normal de tu fase, nunca la de descarga.</p>
     <p><b>2. Ordena los problemas por importancia,</b> como un entrenador: primero lo estructural (un músculo sin trabajo, un músculo grande entrenado un solo día, días más largos que tu tiempo), después el volumen de cada músculo, después sus funciones y al final detalles de eficiencia.</p>
-    <p><b>3. Busca el arreglo menos invasivo.</b> Primero sumar o bajar series de lo que ya hacés; después cambiar un ejercicio por otro del mismo músculo o pasarlo de día; y solo si hace falta, agregar o sacar. Un ejercicio nuevo solo se propone si trae algo que tu plan no tiene: otro tipo de movimiento para ese músculo, o un día más de trabajo. Prefiere ejercicios que ya hiciste, tus favoritos y los del mismo equipo.</p>
-    <p style="margin-bottom:0"><b>4. Prueba cada cambio sobre todo el plan</b> y lo descarta si empeora algo más importante: nunca deja un músculo debajo de su mínimo, nunca rompe una función que ya tenías cubierta y nunca te pasa de tu tiempo por sesión. Respeta tus objetivos y prioridades de cada músculo (en Progreso → Series por músculo).</p></div>`;
+    <p><b>3. Busca el arreglo menos invasivo.</b> Primero sumar o bajar series de lo que ya hacés; después cambiar un ejercicio por otro del mismo músculo o pasarlo de día; y solo si hace falta, agregar o sacar. Un ejercicio nuevo solo se propone si trae algo que tu plan no tiene: otro tipo de movimiento para ese músculo, o un día más de trabajo. Para elegir cuál cambiar, busca el que más se parece a otro que ya tenés; para elegir por cuál, prefiere ejercicios que ya hiciste, tus favoritos, los del mismo equipo y los que aportan algo distinto.</p>
+    <p style="margin-bottom:0"><b>4. Prueba cada cambio sobre todo el plan</b> y lo descarta si empeora algo más importante: nunca deja un músculo debajo de su mínimo, nunca rompe una función que ya tenías cubierta, nunca te pasa de tu tiempo por sesión y sube el volumen de a poco (como mucho +50% por músculo de una vez). Respeta tus objetivos y prioridades de cada músculo (en Progreso → Series por músculo) y tus preferencias: los ejercicios que no querés hacer y los que no querés que toque.</p>
+    <p style="margin-bottom:0"><b>Cada sugerencia dice qué tan importante es:</b> <span class="lvl imp">Importante</span> es una carencia real, <span class="lvl mej">Mejora</span> es una oportunidad y <span class="lvl opt">Opcional</span> es un detalle: no todo lo que se puede mejorar hace falta cambiarlo.</p></div>`;
   if (S.settings.anDis && Object.keys(S.settings.anDis).length) h += `<button class="big ghost" data-a="anReset">Volver a mostrar las sugerencias descartadas</button>`;
   return h;
 }
@@ -3474,6 +3520,10 @@ const A = {
   openAnalysis: () => go('analysis'),
   anDismiss: d => { S.settings.anDis = Object.assign({}, S.settings.anDis, { [d.k]: Date.now() }); S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
   anReset: () => { S.settings.anDis = {}; S.settings.u = Date.now(); save(); render(); },
+  anNo: d => { S.settings.anNo = [...new Set([...(S.settings.anNo || []), d.id])]; S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast('No se va a sugerir más'); },
+  anKeep: d => { S.settings.anKeep = [...new Set([...(S.settings.anKeep || []), d.id])]; S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast('No se va a tocar'); },
+  anNoRm: d => { S.settings.anNo = (S.settings.anNo || []).filter(x => x !== d.id); S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  anKeepRm: d => { S.settings.anKeep = (S.settings.anKeep || []).filter(x => x !== d.id); S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
   anMin: d => { S.settings.anMin = Math.min(120, Math.max(40, anLim() + +d.k)); S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
   anTab: d => { anTab = d.k; render(); window.scrollTo(0, 0); },
   anTog: d => { anOff.has(d.k) ? anOff.delete(d.k) : anOff.add(d.k); const y = window.scrollY; render(); window.scrollTo(0, y); },
