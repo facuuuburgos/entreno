@@ -523,7 +523,7 @@ details.tech[open] ol,details.tech[open] ul,details.tech[open] .kicker,details.t
 .ic{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--acd);color:var(--ac)}
 .ic svg{width:20px;height:20px}
 .ic.blue{background:rgba(127,211,255,.12);color:#7fd3ff}.ic.violet{background:rgba(155,140,255,.14);color:#a99cff}
-.ic.orange{background:rgba(255,179,71,.13);color:#ffb347}.ic.pink{background:rgba(255,122,182,.12);color:#ff7ab6}
+.ic.orange{background:rgba(255,179,71,.13);color:#ffb347}.ic.gold{background:rgba(255,224,102,.13);color:#ffe066}.ic.pink{background:rgba(255,122,182,.12);color:#ff7ab6}
 .row>.ic+.sp,.exrow>.ic+.sp{margin-left:2px}
 #app.enter .ic{animation:pop .5s cubic-bezier(.2,.9,.3,1.3) .15s both}
 .pill2{font-size:13px;font-weight:750;padding:5px 10px;border-radius:99px;background:var(--acd);color:var(--ac);margin-right:6px;font-variant-numeric:tabular-nums}
@@ -570,6 +570,12 @@ b.warn{color:#ffb347}
 .lvl{display:inline-block;font-size:10.5px;letter-spacing:.04em;padding:2px 7px;border-radius:99px;margin-left:4px;vertical-align:1px;font-weight:700}
 .lvl.imp{background:rgba(255,107,107,.16);color:#ff8a8a}.lvl.mej{background:rgba(190,242,100,.14);color:var(--ac)}.lvl.opt{background:var(--s3);color:var(--mu)}
 .prefl{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}.prefl button{background:none;padding:4px 0;font-size:13px;color:var(--mu);text-decoration:underline;text-underline-offset:3px}
+.wkday{padding:16px 16px 8px}.wkrow{display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--ln);position:relative}
+.wkn{width:20px;flex-shrink:0;color:var(--mu);font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;text-align:center}
+.wkname{font-weight:600;font-size:15px;line-height:1.3}.wkmeta{font-size:12.5px;margin-top:2px;line-height:1.35}
+.wkrx{font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}.wkrx span{color:var(--mu);font-weight:500;margin:0 2px}
+.wkrow.ssa,.wkrow.ssb{box-shadow:inset 3px 0 0 var(--ac);padding-left:8px;margin-left:-8px}.wkrow.ssb{border-top-color:transparent}
+.edc{display:flex;gap:10px;align-items:center;padding:12px 16px;margin-bottom:8px}.edc+.sslink,.edo+.sslink{margin-top:-2px}.edchev{font-size:20px;display:inline-block;transition:transform .2s}.edchev.on{transform:rotate(90deg)}
 </style>
 </head>
 <body>
@@ -590,7 +596,7 @@ b.warn{color:#ffb347}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '8.5';
+const KEY = 'entreno.v1', VERSION = '8.6';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2079,7 +2085,7 @@ window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
   try { seedBio(); } catch (e) {}
-  const views = { program: vProgram, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, maxes: vMaxes, compare: vCompare, analysis: vAnalysis, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, week: vWeek, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, maxes: vMaxes, compare: vCompare, analysis: vAnalysis, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -2094,7 +2100,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', analysis: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { week: 'train', session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', analysis: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -2345,6 +2351,8 @@ function vTrain() {
       <div class="row" style="margin:12px 0 2px;gap:8px;flex-wrap:wrap">${phaseChip(ph)}<span class="mu sm">${done ? '✓ Fase completada' : `Semana ${w} de ${ph.weeks}`}${weekParams(ph, c.wEff).deload ? ' · descarga' : ''}</span></div>
       ${timeline(prog)}${done ? '' : `<div class="mu sm" style="margin-top:10px">${weekStatus(c)}</div>`}</div>`;
     if (done) h += phaseDoneCard(c);
+    if (P.act.length) h += `<div class="card clickable" data-a="openWeek" style="margin-top:12px"><div class="row">${ico('list', 'blue')}<div class="sp"><div class="t" style="font-size:16px">Rutina completa</div>
+      <div class="mu sm">Todos los días con sus ejercicios, series y repeticiones</div></div><span class="mu">›</span></div></div>`;
     h += `<div class="row" style="margin:28px 0 12px;align-items:baseline"><h2 class="sp" style="margin:0">Días de la fase</h2><button class="link" data-a="bulkEdit" data-id="${ph.id}" style="margin-right:16px">Cambiar todos</button><button class="link" data-a="openPhase" data-id="${ph.id}">Editar</button></div>`;
     if (!P.act.length) h += `<div class="card c"><p class="mu sm" style="margin-top:0">Esta fase todavía no tiene días.</p><button class="big pri" data-a="newDay" data-id="${ph.id}">+ Agregar día</button></div>`;
     P.act.forEach((r, k) => {
@@ -2449,20 +2457,26 @@ function tplListHtml(mode, id) {
       <span class="mu sm" style="display:block;margin-top:4px">${t.desc}</span></span></button>`; }).join('') +
     `<p class="mu sm" style="margin:10px 2px 4px">En ejercicios de aislamiento (laterales, curls, extensiones…) usa repeticiones moderadas y repeticiones en reserva, sin %: así se programan en la práctica.</p>`;
 }
+let edOpen = new Set(), edFor = null;
 function vEdit() {
   const d = draft;
+  d.items.forEach(it => { if (!it.id) it.id = uid(); });
+  if (edFor !== d) { edFor = d; if (!d._new) edOpen = new Set(); }
   let h = `<div class="head"><button class="ghost" data-a="cancelEdit">Cancelar</button><div class="sp t c">${d.phaseId ? (d._new ? 'Nuevo día' : 'Editar día') : d._new ? 'Nueva rutina' : 'Editar rutina'}</div><button class="pri" data-a="saveEdit">Guardar</button></div>
   <label class="f"><span>Nombre</span><input data-f="dname" value="${esc(d.name)}" placeholder="Ej: Push"></label>
   <label class="f"><span>Descripción (opcional)</span><textarea data-f="ddesc">${esc(d.desc)}</textarea></label>
   ${d.phaseId && findPhase(d.phaseId) ? `<div class="note" style="margin-top:0">Fase “${esc(findPhase(d.phaseId).ph.name)}”: estos son los valores de la semana 1. La progresión semanal de la fase se aplica sola. <button class="link" style="padding:0;font-size:13px" data-a="rxInfo">¿Qué son % y RIR?</button></div>` : ''}
   <h2>Ejercicios · en este orden te va a guiar</h2>`;
   if (!d.items.length) h += `<div class="card mu">Sin ejercicios todavía.</div>`;
+  if (d.items.length > 1) h += `<div class="row" style="margin:-4px 0 10px"><span class="sp mu sm">Tocá un ejercicio para editarlo</span><button class="link" data-a="edAll">${d.items.every(it => edOpen.has(it.id)) ? 'Cerrar todos' : 'Abrir todos'}</button></div>`;
   d.items.forEach((it, i) => {
-    const e = exById(it.exerciseId) || { name: '(ejercicio eliminado)' };
-    h += `<div class="card"><div class="row"><div class="sp t">${i + 1}. ${esc(e.name)}${e.unilateral ? ' <span class="mu sm">(c/lado)</span>' : ''}</div>
-      <button class="sm ghost" data-a="itMove" data-i="${i}" data-d="-1" ${i ? '' : 'disabled'}>↑</button>
-      <button class="sm ghost" data-a="itMove" data-i="${i}" data-d="1" ${i < d.items.length - 1 ? '' : 'disabled'}>↓</button>
-      <button class="sm ghost danger" data-a="itDel" data-i="${i}">✕</button></div>
+    const e = exById(it.exerciseId) || { name: '(ejercicio eliminado)' }, open = edOpen.has(it.id);
+    const sum = [`${it.sets} × ${repsTxt(it.repMin, it.repMax)}`, fmtRest(it.rest), it.rir != null && it.rir !== '' ? 'RIR ' + it.rir : '', it.pct ? fmtNum(it.pct) + '%' : ''].filter(Boolean).join(' · ');
+    if (!open) { h += `<div class="card edc clickable" data-a="edTog" data-id="${it.id}"><span class="wkn">${i + 1}</span><div class="sp" style="min-width:0"><div class="wkname">${esc(e.name)}${e.unilateral ? ' <span class="mu sm">(c/lado)</span>' : ''}</div><div class="mu wkmeta">${sum}${it.notes ? ' · ' + esc(it.notes) : ''}</div></div><span class="mu edchev">›</span></div>`; }
+    else h += `<div class="card edo"><div class="row"><div class="sp t clickable" data-a="edTog" data-id="${it.id}">${i + 1}. ${esc(e.name)}${e.unilateral ? ' <span class="mu sm">(c/lado)</span>' : ''} <span class="mu edchev on">›</span></div>
+      <button class="sm ghost" data-a="itMove" data-i="${i}" data-d="-1" ${i ? '' : 'disabled'} aria-label="Subir">↑</button>
+      <button class="sm ghost" data-a="itMove" data-i="${i}" data-d="1" ${i < d.items.length - 1 ? '' : 'disabled'} aria-label="Bajar">↓</button>
+      <button class="sm ghost danger" data-a="itDel" data-i="${i}" aria-label="Quitar">✕</button></div>
       <div class="grid4">
         <label><span>Series</span><input inputmode="numeric" data-f="it" data-k="sets" data-i="${i}" value="${it.sets}"></label>
         <label><span>Reps mín.</span><input inputmode="numeric" data-f="it" data-k="repMin" data-i="${i}" value="${it.repMin}"></label>
@@ -2475,10 +2489,32 @@ function vEdit() {
         <label><span>Peso ref.</span><input inputmode="decimal" data-f="it" data-k="startW" data-i="${i}" value="${esc(fmtNum(it.startW))}" placeholder="—"></label>
       </div>
       <input data-f="it" data-k="notes" data-i="${i}" value="${esc(it.notes)}" placeholder="Notas: agarre, asiento, técnica…" style="margin-top:8px"></div>`;
-    if (i < d.items.length - 1) h += `<button class="sslink ${it.ss ? 'on' : ''}" data-a="itSS" data-i="${i}">${it.ss ? '⛓ Superserie con el siguiente · tocá para separar' : '+ Hacer superserie con el siguiente'}</button>`;
+    // La superserie solo se muestra entre tarjetas si está activa; para crearla, desde el ejercicio abierto
+    if (i < d.items.length - 1 && (it.ss || edOpen.has(it.id))) h += `<button class="sslink ${it.ss ? 'on' : ''}" data-a="itSS" data-i="${i}">${it.ss ? '⛓ Superserie con el siguiente · tocá para separar' : '+ Hacer superserie con el siguiente'}</button>`;
   });
   h += `<button class="big" style="background:var(--s1)" data-a="pickForRoutine">+ Añadir ejercicio</button>`;
   return h;
+}
+
+/* ---------- Rutina completa (vista de la semana) ---------- */
+function vWeek() {
+  const c = progCtx(), P = plan(), ph = c ? c.ph : null, w = c ? c.wEff : 1;
+  const days = P.act.length ? P.act : S.routines.filter(r => !r.archived && !r.phaseId);
+  const M = {}; try { analyzePlan().P0.days.forEach(d => M[d.rid] = dMin(d)); } catch (e) {}
+  let tot = 0, nex = 0;
+  const body = days.map((r, k) => { const rr = r.phaseId ? ph : null; let sets = 0;
+    const rows = r.items.map((it, i) => { const e = exById(it.exerciseId) || { name: '(ejercicio eliminado)' }, p = prescribe(it, rr, w), prev = r.items[i - 1];
+      sets += p.sets; nex++;
+      const meta = [fmtRest(p.rest), p.rir != null ? 'RIR ' + p.rir : '', p.pct ? fmtNum(p.pct) + '%' : '', e.unilateral ? 'por lado' : ''].filter(Boolean).join(' · ');
+      return `<div class="wkrow ${it.ss && i < r.items.length - 1 ? 'ssa' : ''} ${prev && prev.ss ? 'ssb' : ''}"><span class="wkn">${i + 1}</span><div class="sp" style="min-width:0"><div class="wkname">${esc(e.name)}</div><div class="mu wkmeta">${meta}${prev && prev.ss ? ' · superserie' : ''}</div></div>
+        <b class="wkrx">${p.sets}<span>×</span>${repsTxt(p.repMin, p.repMax)}</b></div>`; }).join('');
+    tot += sets;
+    return `<div class="card wkday"><div class="row clickable" data-a="routineMenu" data-id="${r.id}" style="align-items:flex-start;margin-bottom:6px"><div class="sp"><div class="kicker" style="font-size:11.5px">Día ${k + 1}</div><div class="t" style="font-size:18px;margin-top:2px">${esc(r.name)}</div></div>
+      <div class="mu sm" style="text-align:right;white-space:nowrap">${sets} series${M[r.id] ? `<br>~${M[r.id]} min` : ''}</div></div>${rows || '<div class="mu sm">Sin ejercicios</div>'}</div>`; }).join('');
+  let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Tu rutina</div><h1 style="margin-top:6px">Rutina completa</h1>
+    ${c ? `<p class="mu sm" style="margin-top:-6px">${esc(ph.name)} · semana ${c.w} de ${ph.weeks}${weekParams(ph, w).deload || deloadNow() ? ' · descarga' : ''}. Son los valores de esta semana, con la progresión de la fase ya aplicada.</p>` : ''}
+    <div class="tiles" style="margin-bottom:16px"><div class="tile"><b>${days.length}</b><span>Días</span></div><div class="tile"><b>${nex}</b><span>Ejercicios</span></div><div class="tile"><b>${tot}</b><span>Series por semana</span></div></div>`;
+  return h + (body || `<div class="card mu">Todavía no hay días en tu plan.</div>`) + `<p class="mu sm">Tocá el nombre de un día para editarlo o empezarlo.</p>`;
 }
 
 /* ---------- Progreso ---------- */
@@ -2521,7 +2557,7 @@ function vProgress() {
       <div class="mu sm">Esta semana: ${ok} de ${main.length} en rango</div></div><span class="mu">›</span></div>
       <div class="mini">${main.map(m => { const n = W[m] ? W[m].sets : 0, rg = MRANGE(m); return `<i class="${n > rg[1] ? 'alto' : n >= rg[0] ? 'ok' : ''}" title="${m}"><b style="height:${Math.min(100, n / rg[1] * 100)}%"></b></i>`; }).join('')}</div></div>`; }
   if (planDays().length) { const A1 = analyzePlan(), n = A1.recs.length;
-    h += `<div class="card clickable" data-a="openAnalysis"><div class="row">${ico('shield', n ? 'orange' : '')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div>
+    h += `<div class="card clickable" data-a="openAnalysis"><div class="row">${ico('shield', 'gold')}<div class="sp"><div class="t" style="font-size:16px">Análisis del plan</div>
       <div class="mu sm">Equilibrio ${A1.score0}/100 · ${n ? `${n} ${n === 1 ? 'sugerencia' : 'sugerencias'}` : 'bien armado'}</div></div><span class="mu">›</span></div></div>`; }
   h += `<div class="card clickable" data-a="openCompare"><div class="row">${ico('compare', 'violet')}<div class="sp"><div class="t" style="font-size:16px">Comparar ciclos</div>
     <div class="mu sm">Una fase contra otra, o estas semanas contra las anteriores</div></div><span class="mu">›</span></div></div>`;
@@ -3460,7 +3496,7 @@ const A = {
   exDel: d => ask('Eliminar ejercicio', 'Se quita de tu biblioteca. Los entrenamientos pasados donde lo hiciste se conservan.', 'Eliminar', () => {
     S.exercises = S.exercises.filter(x => x.id !== d.id); S.deleted.push(d.id); save(); render();
   }, true),
-  back: () => { if (R.view === 'muscle') { go('muscles'); return; } if (['coach', 'muscles', 'body', 'maxes', 'compare', 'analysis'].includes(R.view)) { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
+  back: () => { if (R.view === 'week') { go('train'); return; } if (R.view === 'muscle') { go('muscles'); return; } if (['coach', 'muscles', 'body', 'maxes', 'compare', 'analysis'].includes(R.view)) { go('progress'); return; } const to = R.from && R.from !== R.view && R.from !== 'workout' ? R.from : (R.view === 'exercise' ? 'progress' : 'history'); fresh = null; go(to); },
   metric: d => { metric = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   resume: () => go('workout'),
   start: d => {
@@ -3546,6 +3582,9 @@ const A = {
   openCoach: () => go('coach'),
   openMaxes: () => go('maxes'),
   openAnalysis: () => go('analysis'),
+  openWeek: () => go('week'),
+  edTog: d => { edOpen.has(d.id) ? edOpen.delete(d.id) : edOpen.add(d.id); const y = window.scrollY; render(); window.scrollTo(0, y); },
+  edAll: () => { const all = draft.items.every(it => edOpen.has(it.id)); draft.items.forEach(it => all ? edOpen.delete(it.id) : edOpen.add(it.id)); const y = window.scrollY; render(); window.scrollTo(0, y); },
   anDismiss: d => { S.settings.anDis = Object.assign({}, S.settings.anDis, { [d.k]: Date.now() }); S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); },
   anReset: () => { S.settings.anDis = {}; S.settings.u = Date.now(); save(); render(); },
   anNo: d => { S.settings.anNo = [...new Set([...(S.settings.anNo || []), d.id])]; S.settings.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast('No se va a sugerir más'); },
@@ -3799,7 +3838,7 @@ const A = {
   itDel: d => { draft.items.splice(+d.i, 1); render(); },
   pickForRoutine: () => openPicker(id => {
     const f = draft.phaseId && findPhase(draft.phaseId), v = f ? tplVals(tplOf(f.ph), f.ph.type, id) : null;
-    draft.items.push(Object.assign({ id: uid(), exerciseId: id, sets: 3, repMin: 8, repMax: 10, rest: S.settings.rest, pct: null, rir: null, notes: '' }, v || {})); render();
+    const nid = uid(); draft.items.push(Object.assign({ id: nid, exerciseId: id, sets: 3, repMin: 8, repMax: 10, rest: S.settings.rest, pct: null, rir: null, notes: '' }, v || {})); edOpen.add(nid); render();
   }),
   dupRoutine: d => {
     closeModal();
