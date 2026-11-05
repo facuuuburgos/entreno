@@ -554,6 +554,11 @@ html,body,*{scrollbar-width:none}
 .covr.ok i{background:var(--acd);color:var(--ac)}.covr.no i{background:rgba(255,122,182,.14);color:#ff7ab6}.covr.opt i{background:var(--s2);color:var(--mu)}
 .covr .mu{font-size:12.5px;text-align:right;max-width:45%}
 b.warn{color:#ffb347}
+.recwhy{background:var(--s2);border-radius:12px;padding:10px 12px;margin-top:12px}
+.rb{font-size:13.5px;line-height:1.45;padding:3px 0 3px 18px;position:relative}.rb:before{position:absolute;left:0;top:3px;font-weight:800}
+.rb.ok:before{content:'+';color:var(--ac)}.rb.no:before{content:'−';color:#ffb347}
+.ring2{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:conic-gradient(var(--ac) calc(var(--p)*1%),var(--s2) 0);position:relative}
+.ring2:before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--s1)}.ring2 b{position:relative;font-size:20px;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -574,7 +579,7 @@ b.warn{color:#ffb347}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '8.0';
+const KEY = 'entreno.v1', VERSION = '8.1';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1475,126 +1480,152 @@ const ASRC = { 1: ['Squat vs extensión de cuádriceps (J Sports Sci, 2021)', 'h
   13: ['Schoenfeld et al., 2016: frecuencia', 'https://pubmed.ncbi.nlm.nih.gov/27102172/'], 14: ['Singer et al., 2024: descansos', 'https://doaj.org/article/18363f4031e0487793db2084bee23f38'] };
 // Minutos estimados de un día: series × (trabajo + descanso) + preparación de cada ejercicio + entrada en calor
 function dayMin(r, ph, w) { return Math.round((r.items.reduce((a, it) => { const p = prescribe(it, ph, w); return a + p.sets * (40 + p.rest) + 90; }, 0) + 300) / 60); }
-function analyzePlan() {
-  const c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1, days = planDays();
-  const inPlan = new Set(days.flatMap(r => r.items.map(i => i.exerciseId))), used = new Set(S.sessions.flatMap(s => s.exercises.map(e => e.exerciseId)));
-  const dis = (S.settings.anDis || {}), recs = [], add = r => { if (!dis[r.key]) recs.push(r); };
-  const IT = days.flatMap((r, d) => r.items.map(it => { const p = prescribe(it, ph, w), ex = exById(it.exerciseId) || { name: '(ejercicio)' };
-    return { r, d, it, ex, pat: patOf(it.exerciseId), mm: exMus(it.exerciseId, ex.name), main: mainMus(it.exerciseId), sets: p.sets }; }));
-  const mins = days.map(r => dayMin(r, ph, w));
-  const pick = (names, pats) => { const L = names.map(n => S.exercises.find(x => norm(x.name) === norm(n))).filter(Boolean);
-    S.exercises.forEach(x => { if (pats.includes(patOf(x.id)) && !L.includes(x)) L.push(x); });
-    return L.filter(x => !inPlan.has(x.id)).sort((a, b) => used.has(b.id) - used.has(a.id))[0] || null; };
-  const wkSets = m => IT.reduce((a, x) => a + (x.mm[m] || 0) * x.sets, 0);
-  const consumed = new Set(), newPats = new Set();
-  const sat = (m, list) => (REQ[m] || []).map(q => list.some(x => q.any.includes(x.pat) && (x.mm[m] || 0) > 0));
-  // 1) Cobertura: funciones que faltan en toda la semana
-  const cover = [];
-  Object.entries(REQ).forEach(([m, reqs]) => {
-    const trained = IT.some(x => (x.mm[m] || 0) >= 1) || wkSets(m) > 0;
-    reqs.forEach((q, qi) => {
-      const have = IT.filter(x => q.any.includes(x.pat) && (x.mm[m] || 0) > 0);
-      cover.push({ m, q, have });
-      if (have.length || !days.length) return;
-      if (q.opt === 'prio' && !isPrio(m)) return;
-      if (!trained && !MRANGE(m)) return;
-      const sug = pick(q.ex, q.any); if (!sug) return;
-      // ¿Se puede reemplazar un ejercicio del mismo músculo sin perder otra función? (primero los repetidos)
-      const before = sat(m, IT), sp = patOf(sug.id), smm = exMus(sug.id);
-      const okRep = x => { const after = sat(m, IT.map(y => y === x ? { ...y, pat: sp, mm: smm } : y)); return before.every((v, k) => !v || after[k]); };
-      const isDup = x => IT.some(y => y !== x && y.pat === x.pat && y.main === x.main), dayDup = x => IT.some(y => y !== x && y.d === x.d && y.pat === x.pat && y.main === x.main);
-      const dup = IT.filter(x => x.main === m && !consumed.has(x.it.id) && okRep(x)).sort((a, b) => dayDup(b) - dayDup(a) || isDup(b) - isDup(a) || a.sets - b.sets)[0];
-      const base = { key: `cov:${m}:${qi}`, cat: 'Cobertura', m, src: q.src, soft: !!q.opt };
-      if (dup) { consumed.add(dup.it.id); newPats.add(m + ':' + sp);
-        add({ ...base, type: 'replace', rid: dup.r.id, iid: dup.it.id, to: sug.id,
-          title: `${m}: falta ${q.label.toLowerCase()}`, why: `${q.why} ${isDup(dup) ? `Ya tenés dos ejercicios con el mismo patrón (${esc(PATN[dup.pat].toLowerCase())}), así que no hace falta sumar uno más: cambiá uno.` : 'Reemplazando este ejercicio cubrís la función sin alargar la sesión ni perder nada de lo que ya trabajás.'}`,
-          act: `Cambiar <b>${esc(dup.ex.name)}</b> por <b>${esc(sug.name)}</b> en ${esc(dup.r.name)}` }); return; }
-      newPats.add(m + ':' + sp);
-      // Si no, agregarlo al día más corto que ya trabaje ese grupo (sin pasarse de duración)
-      const cand = days.map((r, d) => ({ r, d, n: r.items.length, min: mins[d], hits: IT.filter(x => x.d === d && (x.mm[m] || 0) > 0).length })).filter(x => x.n < 8 && x.min < 75).sort((a, b) => (b.hits > 0) - (a.hits > 0) || a.min - b.min)[0];
-      if (cand) add({ ...base, type: 'add', rid: cand.r.id, to: sug.id, title: `${m}: falta ${q.label.toLowerCase()}`, why: q.why + (cand.min > 60 ? '' : ' Este día tiene lugar sin hacerse largo.'),
-        act: `Agregar <b>${esc(sug.name)}</b> (3 series) a ${esc(cand.r.name)} · queda en ~${cand.min + 7} min` });
-      else add({ ...base, type: 'info', title: `${m}: falta ${q.label.toLowerCase()}`, why: q.why + ' Tus días ya están largos: conviene reemplazar algún ejercicio en vez de agregar.', act: `Por ejemplo: ${esc(sug.name)}` });
-    });
+// ===== Modelo del plan: evalúa la semana completa como un todo y busca los cambios que más la mejoran =====
+// No aplica reglas sueltas: cada posible cambio se simula sobre TODO el plan y se compara el resultado
+// (volumen y frecuencia de cada músculo, funciones cubiertas, series por sesión, duración, repeticiones de patrón y equilibrio empuje/tracción).
+const _mc = {};
+const MMc = id => _mc['m' + id] || (_mc['m' + id] = exMus(id));
+const PTc = id => _mc['p' + id] || (_mc['p' + id] = patOf(id));
+const GRP = m => (AM.find(a => a[0] === m) || [])[2] || 'core';
+const exGrp = id => GRP(mainMus(id));
+function planModel() {
+  const c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1;
+  return { days: planDays().map(r => ({ rid: r.id, name: r.name, items: r.items.map(it => { const p = prescribe(it, ph, w); return { iid: it.id, ex: it.exerciseId, sets: p.sets, rest: p.rest }; }) })) };
+}
+const cloneP = P => ({ days: P.days.map(d => ({ ...d, items: d.items.map(x => ({ ...x })) })) });
+const dMin = d => Math.round((d.items.reduce((a, x) => a + x.sets * (40 + x.rest) + 90, 0) + 300) / 60);
+function evalPlan(P) {
+  const parts = {}, put = (k, v, info) => { if (v > .005) parts[k] = Object.assign({ v }, info); };
+  const nd = P.days.length, mus = {};
+  P.days.forEach((d, di) => d.items.forEach(x => { const mm = MMc(x.ex), pt = PTc(x.ex);
+    for (const m in mm) { const o = mus[m] || (mus[m] = { V: 0, dayV: Array(nd).fill(0), dd: Array(nd).fill(false), pat: {} }); const v = x.sets * mm[m];
+      o.V += v; o.dayV[di] += v; if (mm[m] >= 1) o.dd[di] = true; o.pat[pt] = (o.pat[pt] || 0) + v; } }));
+  AM.forEach(([m]) => { const rg = MRANGE(m); if (!rg) return;
+    const o = mus[m] || { V: 0, dayV: Array(nd).fill(0), dd: [], pat: {} }, pr = isPrio(m) ? 1.5 : 1, lo = isPrio(m) ? Math.round((rg[0] + rg[1]) / 2) : rg[0], big = rg[0] >= 10;
+    if (o.V < lo) put('vol:' + m, pr * 1.2 * Math.pow((lo - o.V) / lo, 1.3), { m, kind: 'vol', V: o.V, lo, hi: rg[1] });
+    else if (o.V > rg[1] * 1.1) put('volhi:' + m, (o.V - rg[1]) / rg[1] * .6, { m, kind: 'volhi', V: o.V, hi: rg[1] });
+    if (big && nd >= 2 && o.V >= 6 && o.dd.filter(Boolean).length <= 1) put('freq:' + m, .45 * pr, { m, kind: 'freq' });
+    o.dayV.forEach((v, di) => { if (v > 11) put(`ses:${m}:${di}`, (v - 11) / 11 * .8, { m, kind: 'ses', di, V: v }); });
+    (REQ[m] || []).forEach((q, qi) => { const sh = q.any.reduce((a, p) => a + (o.pat[p] || 0), 0), share = sh / Math.max(o.V, 1), want = q.opt ? .2 : .25;
+      const wq = (q.opt === 'prio' ? (isPrio(m) ? .6 : 0) : q.opt ? .3 : 1) * pr * Math.min(1, o.V / rg[0] + .3) * (big ? 1 : .8);
+      if (wq > 0 && share < want) put(`fn:${m}:${qi}`, wq * (want - share) / want, { m, kind: 'fn', qi, share }); });
   });
-  // 2) Redundancia: mismo patrón para el mismo músculo, el mismo día
-  days.forEach((r, d) => { const L = IT.filter(x => x.d === d);
-    L.forEach((x, i) => L.slice(i + 1).forEach(y => {
-      if (x.pat !== y.pat || x.main !== y.main || x.pat === 'other' || consumed.has(y.it.id) || consumed.has(x.it.id)) return;
-      const m = x.main; if (isPrio(m)) return;
-      const rg = MRANGE(m); if (rg && wkSets(m) < rg[0]) return; // si falta volumen, repetir el patrón tiene sentido
-      const have = new Set(IT.filter(z => (z.mm[m] || 0) > 0).map(z => z.pat)); newPats.forEach(k => { if (k.startsWith(m + ':')) have.add(k.split(':')[1]); });
-      const alts = [...new Set(S.exercises.filter(z => mainMus(z.id) === m).map(z => patOf(z.id)))].filter(p => !have.has(p) && p !== 'other');
-      const alt = alts.map(p => pick((REQ[m] || []).flatMap(q => q.any.includes(p) ? q.ex : []), [p])).find(Boolean);
-      if (!alt) return; consumed.add(y.it.id);
-      add({ key: `dup:${y.it.id}`, cat: 'Redundancia', type: 'replace', rid: r.id, iid: y.it.id, to: alt.id, m, src: 11, soft: true,
-        title: `${esc(r.name)}: ${esc(x.ex.name)} y ${esc(y.ex.name)} hacen casi lo mismo`, why: `Los dos son ${esc(PATN[x.pat].toLowerCase())} para ${m}. Variar de forma planificada (patrones distintos) ayuda más que repetir uno parecido. Es opcional: si te gusta así, descartalo.`,
-        act: `Cambiar <b>${esc(y.ex.name)}</b> por <b>${esc(alt.name)}</b> (${esc(PATN[patOf(alt.id)].toLowerCase())})` }); })); });
-  // 3) Distribución: demasiadas series de un músculo en un solo día, o un músculo grande entrenado un solo día
-  AM.forEach(([m]) => { const rg = MRANGE(m); if (!rg || rg[0] < 10 || days.length < 2) return;
-    const per = days.map((r, d) => IT.filter(x => x.d === d).reduce((a, x) => a + (x.mm[m] || 0) * x.sets, 0)), direct = days.map((r, d) => IT.some(x => x.d === d && (x.mm[m] || 0) >= 1));
-    const big = per.findIndex(v => v > 11), nd = direct.filter(Boolean).length;
-    const di = big >= 0 ? big : nd === 1 && IT.filter(x => x.d === direct.indexOf(true) && (x.mm[m] || 0) >= 1).length >= 2 ? direct.indexOf(true) : -1;
-    if (di < 0) return;
-    const mv = IT.filter(x => x.d === di && x.main === m && !consumed.has(x.it.id)).sort((a, b) => a.sets - b.sets)[0]; if (!mv) return;
-    const grp = (AM.find(a => a[0] === m) || [])[2], sameG = d => IT.some(x => x.d === d && Object.keys(x.mm).some(k => (AM.find(a => a[0] === k) || [])[2] === grp && x.mm[k] >= 1));
-    const to = days.map((r, d) => ({ r, d, v: per[d], min: mins[d], g: sameG(d) })).filter(x => x.d !== di && x.min < 75).sort((a, b) => b.g - a.g || a.v - b.v || a.min - b.min)[0]; if (!to) return;
-    consumed.add(mv.it.id);
-    add({ key: `mv:${m}:${mv.it.id}`, cat: 'Distribución', type: 'move', rid: days[di].id, iid: mv.it.id, to: to.r.id, m, src: big >= 0 ? 12 : 13,
-      title: big >= 0 ? `${m}: ${half(per[di])} series en ${esc(days[di].name)}` : `${m}: lo entrenás de forma directa un solo día`,
-      why: big >= 0 ? 'Más de ~11 series de un músculo en una sesión suman poco: el crecimiento se estanca y aumenta el cansancio. Repartirlas en dos días rinde más con el mismo trabajo.' : 'Entrenar cada músculo al menos 2 veces por semana dio mejores resultados que 1 vez. Movés un ejercicio y la sesión queda más corta.',
-      act: `Mover <b>${esc(mv.ex.name)}</b> de ${esc(days[di].name)} a ${esc(to.r.name)}` }); });
-  // 3b) Volumen bajo con las funciones ya cubiertas: sumar series a lo que ya hacés antes que agregar ejercicios
-  AM.forEach(([m]) => { const rg = MRANGE(m); if (!rg) return; const v = wkSets(m), gap = rg[0] - v; if (gap < 1.5) return;
-    const cand = IT.filter(x => x.main === m && x.sets < 5 && !consumed.has(x.it.id) && mins[x.d] < 80).sort((a, b) => a.sets - b.sets || mins[a.d] - mins[b.d])[0]; if (!cand) return;
-    const n = Math.min(2, Math.ceil(gap), 5 - cand.sets);
-    add({ key: `vol:${m}:${cand.it.id}`, cat: 'Volumen', type: 'sets', rid: cand.r.id, iid: cand.it.id, n, m, src: 12,
-      title: `${m}: ${half(v)} series por semana`, why: `Tu objetivo es ${rg[0]}–${rg[1]}. Ya tenés las funciones principales cubiertas, así que en vez de agregar otro ejercicio alcanza con sumar series a uno que ya hacés (cada serie suma ~2 minutos).`,
-      act: `Pasar <b>${esc(cand.ex.name)}</b> de ${cand.sets} a ${cand.sets + n} series en ${esc(cand.r.name)}` }); });
-  // 4) Duración de cada día
-  days.forEach((r, d) => { if (mins[d] <= 80 && r.items.length <= 8) return;
-    add({ key: `dur:${r.id}:${r.items.length}`, cat: 'Duración', type: 'info', rid: r.id, src: 12,
-      title: `${esc(r.name)}: ~${mins[d]} min y ${r.items.length} ejercicios`, why: 'Es una sesión larga: al final rendís menos y cuesta sostenerla. Las sugerencias de reemplazo o de mover ejercicios de arriba ayudan a acortarla.', act: 'Considerá sacar el ejercicio que más se repite o pasarlo a otro día.' }); });
-  // 5) Descansos muy cortos en ejercicios grandes
-  const shortR = IT.filter(x => !isIso(x.it.exerciseId) && prescribe(x.it, ph, w).rest < 90);
-  if (shortR.length) add({ key: `rest:${shortR.map(x => x.it.id).join(',')}`, cat: 'Descansos', type: 'rest', items: shortR.map(x => [x.r.id, x.it.id]), src: 14,
-    title: `${shortR.length} ${shortR.length === 1 ? 'ejercicio grande tiene' : 'ejercicios grandes tienen'} menos de 1:30 de descanso`, why: 'Descansar más de 1 minuto da un pequeño beneficio para crecer, sobre todo porque sostenés mejor el peso en las series siguientes. En multiarticulares, 2 minutos es un buen punto.',
-    act: `Poner 2:00 en ${shortR.slice(0, 3).map(x => esc(x.ex.name)).join(', ')}${shortR.length > 3 ? '…' : ''}` });
-  const ord = { Cobertura: 0, Volumen: 1, Distribución: 2, Redundancia: 3, Duración: 4, Descansos: 5 };
-  recs.sort((a, b) => (isPrio(b.m) - isPrio(a.m)) || (a.soft - b.soft) || ord[a.cat] - ord[b.cat]);
-  return { recs, cover, days, mins, IT };
+  P.days.forEach((d, di) => { const mi = dMin(d);
+    if (mi > 70) put('dur:' + di, (mi - 70) / 15 * .8, { kind: 'dur', di, min: mi });
+    if (d.items.length > 8) put('cnt:' + di, (d.items.length - 8) * .3, { kind: 'cnt', di, n: d.items.length });
+    d.items.forEach((x, i) => d.items.slice(i + 1).forEach(y => { const px = PTc(x.ex); if (px !== PTc(y.ex) || px === 'other' || mainMus(x.ex) !== mainMus(y.ex) || isPrio(mainMus(x.ex))) return;
+      put(`dup:${di}:${x.iid}:${y.iid}`, .2, { kind: 'dup', di, m: mainMus(x.ex), a: x.ex, b: y.ex, pat: px }); })); });
+  // Equilibrio entre empujar y tirar (práctica habitual para hombros sanos y espalda equilibrada)
+  const S2 = pts => P.days.reduce((a, d) => a + d.items.filter(x => pts.includes(PTc(x.ex))).reduce((b, x) => b + x.sets, 0), 0);
+  [[['hPush', 'incPush'], ['hPull'], 'horizontal'], [['vPush'], ['vPull'], 'vertical']].forEach(([pu, pl, nm]) => { const a = S2(pu), b = S2(pl), r = Math.max(a, b) / Math.max(1, Math.min(a, b));
+    if (a + b >= 6 && r > 1.8) put('bal:' + nm, .12 * (r - 1.8), { kind: 'bal', nm, push: a, pull: b }); });
+  const total = Object.values(parts).reduce((a, p) => a + p.v, 0);
+  return { total, parts, mus };
+}
+const planScore = t => Math.round(100 / (1 + t / 5));
+function partText(p, P, mode) {
+  const dn = di => esc((P.days[di] || {}).name || ''), q = p.kind === 'fn' ? REQ[p.m][p.qi] : null;
+  switch (p.kind) {
+    case 'vol': return mode === 'issue' ? `<b>${p.m}</b>: ${half(p.V)} series por semana, ${isPrio(p.m) ? 'es tu prioridad y conviene apuntar a' : 'el objetivo es'} ${p.lo}–${p.hi}.` : `<b>${p.m}</b>: hoy hace ${half(p.V)} series por semana y su objetivo es ${p.lo}–${p.hi}; se acerca.`;
+    case 'volhi': return mode === 'issue' ? `<b>${p.m}</b>: ${half(p.V)} series por semana, más de lo útil (${p.hi}).` : `<b>${p.m}</b>: menos volumen de más.`;
+    case 'freq': return mode === 'issue' ? `<b>${p.m}</b>: lo entrenás de forma directa un solo día; 2 días por semana rinde más.` : `<b>${p.m}</b>: pasa a entrenarse 2 días por semana.`;
+    case 'ses': return mode === 'issue' ? `<b>${p.m}</b>: ${half(p.V)} series en ${dn(p.di)}; más de ~11 en una sesión suman poco.` : `<b>${p.m}</b>: menos series de más en una sola sesión.`;
+    case 'fn': return mode === 'issue' ? `<b>${p.m}</b>: ${p.share > 0 ? 'poco trabajo de' : 'falta'} ${q.label.toLowerCase()}.` : `<b>${p.m}</b>: suma ${q.label.toLowerCase()}, que hoy es ${p.share > 0 ? 'solo el ' + Math.round(p.share * 100) + '%' : 'el 0%'} de sus series (conviene ~25% o más). ${q.why}`;
+    case 'dur': return mode === 'issue' ? `<b>${dn(p.di)}</b> dura ~${p.min} min.` : `<b>${dn(p.di)}</b> queda más corta.`;
+    case 'cnt': return mode === 'issue' ? `<b>${dn(p.di)}</b> tiene ${p.n} ejercicios.` : `<b>${dn(p.di)}</b> tiene menos ejercicios.`;
+    case 'dup': return mode === 'issue' ? `<b>${dn(p.di)}</b>: ${esc(exById(p.a).name)} y ${esc(exById(p.b).name)} son el mismo patrón (${PATN[p.pat].toLowerCase()}).` : `Deja de repetir el mismo patrón de ${p.m} en ${dn(p.di)}.`;
+    case 'bal': return mode === 'issue' ? `Empuje y tracción ${p.nm}: ${p.push} contra ${p.pull} series por semana.` : `Más equilibrio entre empujar y tirar (${p.nm}).`;
+  }
+  return '';
+}
+let _anMemo = null;
+function analyzePlan() {
+  const P0 = planModel(), sig = JSON.stringify([P0, S.settings.mt, S.settings.mprio, S.settings.anDis, S.exercises.length]);
+  if (_anMemo && _anMemo.sig === sig) return _anMemo.res;
+  const dis = S.settings.anDis || {}, inPlan = () => new Set(P.days.flatMap(d => d.items.map(x => x.ex)));
+  let P = cloneP(P0), E = evalPlan(P); const E0 = E, recs = [], locked = new Set();
+  const lib = S.exercises.filter(x => !x.archived && PTc(x.id) !== 'other');
+  const dayGroups = d => new Set(d.items.map(x => exGrp(x.ex)));
+  const tv = (d, ex) => { const r = S.routines.find(z => z.id === d.rid), f = r && r.phaseId && findPhase(r.phaseId), v = f ? tplVals(tplOf(f.ph), f.ph.type, ex) : null; return v || { sets: 3, rest: S.settings.rest }; };
+  for (let round = 0; round < 7; round++) {
+    const used = inPlan(), C = [];
+    P.days.forEach((d, di) => { const G = dayGroups(d);
+      d.items.forEach((x, ii) => { if (locked.has(x.iid)) return;
+        lib.forEach(e => { if (used.has(e.id) || !(G.has(exGrp(e.id)) || G.size > 1)) return; const v = tv(d, e.id);
+          C.push({ type: 'rep', di, ii, to: e.id, cost: mainMus(e.id) === mainMus(x.ex) ? .04 : exGrp(e.id) === exGrp(x.ex) ? .14 : .25, key: `rep:${x.iid}:${e.id}`, f: Q => { Object.assign(Q.days[di].items[ii], { ex: e.id, rest: v.rest }); } }); });
+        C.push({ type: 'del', di, ii, cost: .02, key: `del:${x.iid}`, f: Q => { Q.days[di].items.splice(ii, 1); } });
+        P.days.forEach((d2, dj) => { if (dj === di || !(dayGroups(d2).has(exGrp(x.ex)))) return;
+          C.push({ type: 'mov', di, ii, dj, cost: .03, key: `mov:${x.iid}:${d2.rid}`, f: Q => { const [it] = Q.days[di].items.splice(ii, 1); Q.days[dj].items.push(it); } }); });
+        [1, 2].forEach(n => { if (x.sets + n <= 5) C.push({ type: 'sets', di, ii, n, cost: .02 * n, key: `sets:${x.iid}:${x.sets + n}`, f: Q => { Q.days[di].items[ii].sets += n; } }); });
+        if (x.sets > 2) C.push({ type: 'sets', di, ii, n: -1, cost: .02, key: `sets:${x.iid}:${x.sets - 1}`, f: Q => { Q.days[di].items[ii].sets -= 1; } });
+      });
+      lib.forEach(e => { if (used.has(e.id) || !G.has(exGrp(e.id))) return; const v = tv(d, e.id);
+        C.push({ type: 'add', di, to: e.id, cost: .15, key: `add:${d.rid}:${e.id}`, f: Q => { Q.days[di].items.push({ iid: 'new' + e.id, ex: e.id, sets: Math.min(3, v.sets), rest: v.rest }); } }); });
+    });
+    let best = null;
+    C.forEach(c => { if (dis[c.key]) return; const Q = cloneP(P); c.f(Q); const e2 = evalPlan(Q), gain = E.total - e2.total - c.cost;
+      if (gain > .1 && (!best || gain > best.gain)) best = { ...c, gain, Q, e2 }; });
+    if (!best) break;
+    const d = P.days[best.di], x = d.items[best.ii], better = [], worse = [];
+    const keys = new Set([...Object.keys(E.parts), ...Object.keys(best.e2.parts)]);
+    keys.forEach(k => { const a = E.parts[k] ? E.parts[k].v : 0, b = best.e2.parts[k] ? best.e2.parts[k].v : 0;
+      if (a - b > .03) better.push({ p: E.parts[k], d: a - b }); else if (b - a > .03) worse.push({ p: best.e2.parts[k], d: b - a }); });
+    better.sort((a, b) => b.d - a.d); worse.sort((a, b) => b.d - a.d);
+    const exn = id => esc((exById(id) || {}).name || ''), dn = esc(d.name);
+    const title = best.type === 'rep' ? `Cambiar <b>${exn(x.ex)}</b> por <b>${exn(best.to)}</b> en ${dn}` : best.type === 'add' ? `Agregar <b>${exn(best.to)}</b> a ${dn}`
+      : best.type === 'del' ? `Sacar <b>${exn(x.ex)}</b> de ${dn}` : best.type === 'mov' ? `Mover <b>${exn(x.ex)}</b> de ${dn} a ${esc(P.days[best.dj].name)}`
+      : `<b>${exn(x.ex)}</b>: de ${x.sets} a ${x.sets + best.n} series en ${dn}`;
+    const srcs = [...new Set(better.filter(b => b.p.kind === 'fn').map(b => REQ[b.p.m][b.p.qi].src).concat(better.some(b => b.p.kind === 'ses') ? [12] : [], better.some(b => b.p.kind === 'freq') ? [13] : [], better.some(b => b.p.kind === 'dup') ? [11] : []))];
+    const cat = better[0] ? { vol: 'Volumen', volhi: 'Volumen', freq: 'Frecuencia', ses: 'Distribución', fn: 'Funciones', dur: 'Duración', cnt: 'Duración', dup: 'Variedad', bal: 'Equilibrio' }[better[0].p.kind] : 'Plan';
+    const mD = dMin(best.Q.days[best.di]) - dMin(d), mJ = best.type === 'mov' ? dMin(best.Q.days[best.dj]) - dMin(P.days[best.dj]) : 0;
+    recs.push({ key: best.key, type: best.type, cat, title, rid: d.rid, iid: x ? x.iid : null, to: best.type === 'mov' ? P.days[best.dj].rid : best.to, n: best.n, sets: best.type === 'add' ? best.Q.days[best.di].items.slice(-1)[0].sets : null,
+      gain: best.gain, better: [...new Set(better.map(b => partText(b.p, P, 'fix')))].slice(0, 3), worse: [...new Set(worse.map(b => partText(b.p, best.Q, 'issue')))].slice(0, 2), srcs,
+      dur: best.type === 'mov' ? `${dn}: ${mD > 0 ? '+' : ''}${mD} min · ${esc(P.days[best.dj].name)}: ${mJ > 0 ? '+' : ''}${mJ} min` : mD ? `${dn}: ${mD > 0 ? '+' : ''}${mD} min (queda en ~${dMin(best.Q.days[best.di])})` : 'Misma duración' });
+    [x && x.iid, best.type === 'add' ? 'new' + best.to : null].filter(Boolean).forEach(k => locked.add(k));
+    if (best.type === 'rep' || best.type === 'mov') locked.add(x.iid);
+    P = best.Q; E = best.e2;
+  }
+  const issues = Object.values(E0.parts).sort((a, b) => b.v - a.v);
+  const res = { recs, issues, P0, E0, after: E, score0: planScore(E0.total), score1: planScore(E.total) };
+  _anMemo = { sig, res }; return res;
 }
 function vAnalysis() {
-  const A0 = analyzePlan(), { recs, cover, days, mins } = A0;
+  const A0 = analyzePlan(), { recs, issues, P0, E0 } = A0, days = P0.days, mins = days.map(dMin);
   let h = `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">Tu plan</div><h1 style="margin-top:6px">Análisis del plan</h1>
-    <p class="mu sm" style="margin-top:-6px">Revisa todos los días juntos: qué funciones trabaja cada músculo, ejercicios repetidos, cómo se reparte el trabajo y cuánto dura cada sesión. Nada cambia hasta que vos lo aplicás.</p>`;
+    <p class="mu sm" style="margin-top:-6px">Evalúa la semana completa como lo haría un entrenador: cuánto trabaja cada músculo, con qué funciones, en cuántos días, cuánto dura cada sesión y si hay ejercicios que se pisan. Cada sugerencia se prueba sobre todo tu plan antes de mostrártela.</p>`;
   if (!days.length) return h + `<div class="card mu">Cuando tengas días en tu plan, acá vas a ver el análisis.</div>`;
-  h += `<div class="tiles"><div class="tile"><b>${days.length}</b><span>Días</span></div><div class="tile"><b>${A0.IT.length}</b><span>Ejercicios</span></div><div class="tile"><b>~${Math.round(mins.reduce((a, b) => a + b, 0) / days.length)}</b><span>Min por día</span></div></div>`;
+  h += `<div class="card"><div class="row" style="align-items:center;gap:14px"><div class="ring2" style="--p:${A0.score0}"><b>${A0.score0}</b></div><div class="sp"><div class="t" style="font-size:17px">Equilibrio del plan</div>
+    <div class="mu sm">${A0.score0 >= 85 ? 'Muy bien armado.' : A0.score0 >= 70 ? 'Bien armado, con algunos detalles para pulir.' : 'Hay cosas importantes para mejorar.'}${recs.length && A0.score1 > A0.score0 ? ` Con las sugerencias llega a <b style="color:var(--ac)">${A0.score1}</b>.` : ''}</div></div></div>
+    <div class="tiles" style="margin-top:14px"><div class="tile"><b>${days.length}</b><span>Días</span></div><div class="tile"><b>${days.reduce((a, d) => a + d.items.length, 0)}</b><span>Ejercicios</span></div><div class="tile"><b>~${Math.round(mins.reduce((a, b) => a + b, 0) / days.length)}</b><span>Min por día</span></div></div></div>`;
   h += `<h2>Sugerencias${recs.length ? ' · ' + recs.length : ''}</h2>`;
-  if (!recs.length) h += `<div class="card row">${ico('shield')}<div class="sp"><div class="t" style="font-size:16px">Tu plan está bien armado</div><div class="mu sm">Cubre las funciones principales de cada músculo, sin repeticiones de más y con sesiones de duración razonable.</div></div></div>`;
-  const CI = { Volumen: ['bars', 'pink'], Cobertura: ['target', ''], Redundancia: ['compare', 'violet'], Distribución: ['bars', 'blue'], Duración: ['clock', 'orange'], Descansos: ['clock', 'blue'] };
-  recs.forEach((r, i) => { const s = ASRC[r.src];
-    h += `<div class="card rec"><div class="row" style="align-items:flex-start;gap:12px">${ico(...CI[r.cat])}<div class="sp"><div class="kicker" style="font-size:11.5px">${r.cat}${r.soft ? ' · opcional' : ''}</div>
-      <div class="t" style="font-size:16px;margin-top:3px">${r.title}</div></div></div>
-      <p class="sm" style="margin:10px 0 6px;line-height:1.5;color:var(--tx);opacity:.88">${r.why}</p>
-      <div class="recact sm">${r.act}</div>
-      ${s ? `<div class="mu sm" style="margin-top:8px">Fuente: ${s[1] ? `<a href="${s[1]}" target="_blank" rel="noopener">${esc(s[0])}</a>` : esc(s[0])}</div>` : ''}
-      <div class="row" style="gap:8px;margin-top:12px">${r.type !== 'info' ? `<button class="pri sp" data-a="anApply" data-k="${esc(r.key)}">Aplicar</button>` : ''}<button class="${r.type === 'info' ? 'sp' : ''} ghost" data-a="anDismiss" data-k="${esc(r.key)}">${r.type === 'info' ? 'Entendido' : 'Descartar'}</button></div></div>`; });
-  // Cobertura por músculo
-  h += `<h2>Funciones de cada músculo en la semana</h2><div class="card" style="padding:4px 18px">${Object.keys(REQ).map(m => {
-    const L = cover.filter(x => x.m === m);
-    return `<div class="covm"><div class="row"><b class="sp">${isPrio(m) ? '<span style="color:var(--gold)">★</span> ' : ''}${esc(m)}</b><span class="mu sm">${half(A0.IT.reduce((a, x) => a + (x.mm[m] || 0) * x.sets, 0))} series/sem</span></div>
-      ${L.map(x => `<div class="covr ${x.have.length ? 'ok' : x.q.opt ? 'opt' : 'no'}"><i>${x.have.length ? '✓' : x.q.opt ? '·' : '✕'}</i><span class="sp">${esc(x.q.label)}${x.q.opt && !x.have.length ? ' <span class="mu">(opcional)</span>' : ''}</span><span class="mu">${x.have.map(h2 => esc(h2.ex.name)).slice(0, 2).join(', ')}</span></div>`).join('')}</div>`; }).join('')}</div>`;
-  // Días
-  h += `<h2>Duración estimada</h2><div class="card" style="padding:4px 18px">${days.map((r, d) => `<div class="exrow"><div class="sp"><div style="font-weight:600">${esc(r.name)}</div><div class="mu sm">${r.items.length} ejercicios · ${r.items.reduce((a, it) => a + prescribe(it, progCtx() ? progCtx().ph : null, progCtx() ? progCtx().wEff : 1).sets, 0)} series</div></div>
-    <b class="${mins[d] > 80 ? 'warn' : ''}">~${mins[d]} min</b></div>`).join('')}</div>
+  if (!recs.length) h += `<div class="card row">${ico('shield')}<div class="sp"><div class="t" style="font-size:16px">No encontré cambios que mejoren tu plan</div><div class="mu sm">Probé reemplazos, cambios de series, mover ejercicios y agregar o sacar: ninguno mejora el conjunto lo suficiente.</div></div></div>`;
+  else h += `<p class="mu sm" style="margin-top:-4px">Están en orden: cada una se calculó teniendo en cuenta las anteriores. Podés aplicar solo las que quieras; el análisis se rehace solo.</p>`;
+  const CI = { Volumen: ['bars', 'pink'], Funciones: ['target', ''], Frecuencia: ['calx', 'blue'], Distribución: ['bars', 'blue'], Duración: ['clock', 'orange'], Variedad: ['compare', 'violet'], Equilibrio: ['compare', 'blue'], Plan: ['target', ''] };
+  recs.forEach((r, i) => {
+    h += `<div class="card rec"><div class="row" style="align-items:flex-start;gap:12px">${ico(...(CI[r.cat] || CI.Plan))}<div class="sp"><div class="kicker" style="font-size:11.5px">${i + 1} · ${r.cat}</div>
+      <div class="t" style="font-size:16px;margin-top:3px;font-weight:600">${r.title}</div><div class="mu sm" style="margin-top:3px">${r.dur}</div></div></div>
+      <div class="recwhy"><div class="mu sm" style="margin-bottom:4px">Por qué, mirando todo tu plan</div>${r.better.map(t => `<div class="rb ok">${t}</div>`).join('')}
+      ${r.worse.length ? `<div class="mu sm" style="margin:8px 0 4px">A cambio</div>${r.worse.map(t => `<div class="rb no">${t}</div>`).join('')}` : ''}</div>
+      ${r.srcs.length ? `<div class="mu sm" style="margin-top:8px">Fuente: ${r.srcs.map(k => ASRC[k]).filter(Boolean).map(s => s[1] ? `<a href="${s[1]}" target="_blank" rel="noopener">${esc(s[0])}</a>` : esc(s[0])).join(' · ')}</div>` : ''}
+      <div class="row" style="gap:8px;margin-top:12px"><button class="pri sp" data-a="anApply" data-k="${esc(r.key)}">Aplicar</button><button class="ghost" data-a="anDismiss" data-k="${esc(r.key)}">Descartar</button></div></div>`; });
+  const rest = issues.filter(p => p.v > .05).slice(0, 8);
+  if (rest.length) h += `<h2>Diagnóstico</h2><div class="card sm" style="line-height:1.5">${rest.map(p => `<p style="margin:6px 0">${partText(p, P0, 'issue')}</p>`).join('')}</div>
+    <p class="mu sm">Lo que más pesa, de mayor a menor. Algunas cosas no tienen un cambio que convenga (por ejemplo, porque arreglarlas alargaría demasiado las sesiones).</p>`;
+  // Funciones por músculo
+  const mus = E0.mus;
+  h += `<h2>Funciones de cada músculo en la semana</h2><div class="card" style="padding:4px 18px">${Object.keys(REQ).map(m => { const o = mus[m] || { V: 0, pat: {} };
+    return `<div class="covm"><div class="row"><b class="sp">${isPrio(m) ? '<span style="color:var(--gold)">★</span> ' : ''}${esc(m)}</b><span class="mu sm">${half(o.V)} series/sem</span></div>
+      ${REQ[m].map(q => { const sh = q.any.reduce((a, p) => a + (o.pat[p] || 0), 0), pc = o.V ? Math.round(sh / o.V * 100) : 0, st = pc >= (q.opt ? 20 : 25) ? 'ok' : pc > 0 ? 'opt' : q.opt ? 'opt' : 'no';
+        return `<div class="covr ${st}"><i>${st === 'ok' ? '✓' : st === 'no' ? '✕' : '·'}</i><span class="sp">${esc(q.label)}${q.opt ? ' <span class="mu">(opcional)</span>' : ''}</span><span class="mu">${pc}%</span></div>`; }).join('')}</div>`; }).join('')}</div>
+    <p class="mu sm">El porcentaje es la parte de las series de ese músculo que hace esa función. Conviene que cada función esencial tenga al menos ~25%.</p>`;
+  h += `<h2>Duración estimada</h2><div class="card" style="padding:4px 18px">${days.map((d, di) => `<div class="exrow"><div class="sp"><div style="font-weight:600">${esc(d.name)}</div><div class="mu sm">${d.items.length} ejercicios · ${d.items.reduce((a, x) => a + x.sets, 0)} series</div></div>
+    <b class="${mins[di] > 75 ? 'warn' : ''}">~${mins[di]} min</b></div>`).join('')}</div>
     <p class="mu sm">Incluye series, descansos, 1:30 para preparar cada ejercicio y 5 minutos de entrada en calor.</p>`;
-  h += `<h2>Cómo analiza</h2><div class="card sm" style="line-height:1.55">
-    <p style="margin-top:0">Mira la <b>semana completa</b>: si una función ya está en otro día, no te pide repetirla.</p>
-    <p>Cuando falta algo, primero busca un ejercicio <b>repetido</b> para reemplazar; recién después propone agregar, y solo en días que no queden largos.</p>
-    <p>No marca como repetido un ejercicio de un músculo <b>prioritario</b> o que todavía no llega a su objetivo de series.</p>
-    <p style="margin-bottom:0">Las reglas salen de estudios de hipertrofia y de la práctica habitual. Son orientativas: si algo no te sirve (por ejemplo, no hay esa máquina en tu gimnasio), descartalo.</p></div>`;
-  if ((S.settings.anDis && Object.keys(S.settings.anDis).length)) h += `<button class="big ghost" data-a="anReset">Volver a mostrar las sugerencias descartadas</button>`;
+  h += `<h2>Cómo decide</h2><div class="card sm" style="line-height:1.55">
+    <p style="margin-top:0">Arma un modelo de tu semana completa y le pone un puntaje según qué tan bien cumple lo que muestran los estudios: volumen de cada músculo dentro de su objetivo, al menos 2 días por semana para los músculos grandes, no más de ~11 series de un músculo por sesión, que cada músculo tenga sus funciones principales, sesiones de duración razonable y sin ejercicios que se pisen.</p>
+    <p>Después prueba cientos de cambios posibles (reemplazar, mover, sumar o sacar series, agregar o sacar ejercicios) y se queda con los que más mejoran el conjunto. Agregar ejercicios "cuesta" más que reemplazar o ajustar series, así que solo lo sugiere si realmente vale la pena.</p>
+    <p style="margin-bottom:0">Respeta tus objetivos y prioridades de cada músculo (en Progreso → Series por músculo). Es una guía: si algo no te sirve, descartalo y busca otra alternativa.</p></div>`;
+  if (S.settings.anDis && Object.keys(S.settings.anDis).length) h += `<button class="big ghost" data-a="anReset">Volver a mostrar las sugerencias descartadas</button>`;
   return h;
 }
 /* ---------- Comparar ciclos ---------- */
@@ -3272,20 +3303,21 @@ const A = {
   anReset: () => { S.settings.anDis = {}; S.settings.u = Date.now(); save(); render(); },
   anApply: d => {
     const rec = analyzePlan().recs.find(r => r.key === d.k); if (!rec) return;
-    const c = progCtx(), ph = c ? c.ph : null, R1 = S.routines.find(r => r.id === rec.rid);
-    const vals = id => { const f = R1 && R1.phaseId && findPhase(R1.phaseId); return f ? tplVals(tplOf(f.ph), f.ph.type, id) : null; };
-    let msg = 'Listo';
-    if (rec.type === 'replace' && R1) { const it = R1.items.find(x => x.id === rec.iid); if (!it) return; const old = (exById(it.exerciseId) || {}).name;
-      it.exerciseId = rec.to; const v = vals(rec.to); if (v) Object.assign(it, v); it.notes = ''; touch(R1); msg = `${old} → ${(exById(rec.to) || {}).name}`; }
-    else if (rec.type === 'add' && R1) { const f0 = R1.items[0] || {};
-      R1.items.push(Object.assign({ id: uid(), exerciseId: rec.to, sets: 3, repMin: f0.repMin || 8, repMax: f0.repMax || 12, rest: f0.rest || S.settings.rest, notes: '', pct: null, rir: f0.rir ?? null }, vals(rec.to) || {})); touch(R1); msg = `Agregado a ${R1.name}`; }
-    else if (rec.type === 'move' && R1) { const R2 = S.routines.find(r => r.id === rec.to), i = R1.items.findIndex(x => x.id === rec.iid); if (!R2 || i < 0) return;
-      const [it] = R1.items.splice(i, 1); it.ss = false; R2.items.push(it); touch(R1); touch(R2); msg = `Movido a ${R2.name}`; }
-    else if (rec.type === 'sets' && R1) { const it = R1.items.find(x => x.id === rec.iid); if (!it) return; it.sets += rec.n; touch(R1); msg = `${(exById(it.exerciseId) || {}).name}: ${it.sets} series`; }
-    else if (rec.type === 'rest') { rec.items.forEach(([rid, iid]) => { const r = S.routines.find(x => x.id === rid), it = r && r.items.find(x => x.id === iid); if (it) { it.rest = 120; touch(r); } }); msg = 'Descansos en 2:00'; }
-    const fp = R1 && R1.phaseId && findPhase(R1.phaseId); if (fp) touch(fp.prog);
+    const R1 = S.routines.find(r => r.id === rec.rid); if (!R1) return;
+    const vals = id => { const f = R1.phaseId && findPhase(R1.phaseId); return f ? tplVals(tplOf(f.ph), f.ph.type, id) : null; };
+    const exn = id => (exById(id) || {}).name; let msg = 'Listo';
+    const i = R1.items.findIndex(x => x.id === rec.iid), it = R1.items[i];
+    if (rec.type === 'rep' && it) { const old = exn(it.exerciseId), v = vals(rec.to); it.exerciseId = rec.to; it.notes = ''; if (v) Object.assign(it, { repMin: v.repMin, repMax: v.repMax, pct: v.pct, rir: v.rir, rest: v.rest }); msg = `${old} → ${exn(rec.to)}`; }
+    else if (rec.type === 'add') { const f0 = R1.items[0] || {}, v = vals(rec.to) || {};
+      R1.items.push(Object.assign({ id: uid(), exerciseId: rec.to, repMin: f0.repMin || 8, repMax: f0.repMax || 12, rest: f0.rest || S.settings.rest, notes: '', pct: null, rir: f0.rir ?? null }, v, { sets: rec.sets || 3 })); msg = `Agregado a ${R1.name}`; }
+    else if (rec.type === 'del' && it) { R1.items.splice(i, 1); msg = `${exn(it.exerciseId)} sacado de ${R1.name}`; }
+    else if (rec.type === 'mov' && it) { const R2 = S.routines.find(r => r.id === rec.to); if (!R2) return; R1.items.splice(i, 1); it.ss = false; R2.items.push(it); touch(R2); msg = `Movido a ${R2.name}`; }
+    else if (rec.type === 'sets' && it) { it.sets = Math.max(1, it.sets + rec.n); msg = `${exn(it.exerciseId)}: ${it.sets} series`; }
+    else return;
+    touch(R1); const fp = R1.phaseId && findPhase(R1.phaseId); if (fp) touch(fp.prog);
     save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(msg);
   },
+
   openCompare: () => go('compare'),
   tf: d => { tf = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
   exM: d => { exM = d.k; const y = window.scrollY; render(); window.scrollTo(0, y); },
