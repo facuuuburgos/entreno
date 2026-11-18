@@ -596,7 +596,7 @@ b.warn{color:#ffb347}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '8.7';
+const KEY = 'entreno.v1', VERSION = '8.8';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2800,17 +2800,53 @@ function mkWkEx(exId, sets, repMin, repMax, rest, notes, startW, pct = null, rir
   return { id: uid(), exerciseId: exId, name: e.name, muscle: e.muscle, unilateral: !!e.unilateral, repMin, repMax, rest, notes: notes || '', startW: startW ?? null, pct, rir,
     plannedSets: sets, skipped: false, sets: Array.from({ length: sets }, () => ({ w: '', r: '', done: false })) };
 }
-function finishSession() {
+/* ---------- Entrenamientos que quedaron abiertos ---------- */
+// Si pasa mucho tiempo sin actividad, el entrenamiento se cierra con la hora real (la de tu última serie), no con la hora en que volviste a abrir la app.
+const IDLE_ASK = 40 * 60000, IDLE_AUTO = 6 * 3600000;
+const lastActOf = a => Math.max(a.lastAct || 0, a.start, ...a.exercises.flatMap(e => e.sets.map(x => x.ts || 0)));
+const doneSets = a => a.exercises.reduce((n, e) => n + e.sets.filter(x => x.done).length, 0);
+// Hora de cierre razonable: la última actividad + 2 minutos (si la pausa fue larga, nunca la hora actual)
+function realEnd(a) { const last = lastActOf(a), ref = a.paused || Date.now(); return ref - last > IDLE_ASK ? Math.min(ref, last + 120000) : ref; }
+let staleAsked = 0;
+function checkStale() {
+  const a = S.active; if (!a) return;
+  const last = lastActOf(a), idle = Date.now() - last, dn = doneSets(a);
+  if (idle < IDLE_ASK) return;
+  if (idle > IDLE_AUTO) {
+    if (dn) { finishSession(last + 120000, true); const e = last + 120000; toast(`Cerré tu entrenamiento que quedó abierto, con la hora de tu última serie (${new Date(e).toDateString() === new Date().toDateString() ? fmtTime(e) : fmtDate(e) + ', ' + fmtTime(e)})`, false, 5000); }
+    else { S.active = null; save(); if (R.view === 'workout') go('home'); else render(); toast('Descarté un entrenamiento que quedó abierto sin series', false, 4000); }
+    return;
+  }
+  if (Date.now() - staleAsked < 5 * 60000) return; staleAsked = Date.now();
+  openModal(`<div class="t" style="font-size:19px">¿Seguís entrenando?</div>
+    <p class="mu" style="margin-top:6px;line-height:1.5">${esc(a.name)} sigue abierto, pero ${dn ? `tu última serie fue hace ${fmtDur(idle)} (a las ${fmtTime(last)})` : `no registraste ninguna serie en ${fmtDur(idle)}`}. Si te olvidaste de terminarlo, lo cierro con la hora real.</p>
+    ${dn ? `<button class="big pri" data-a="staleEnd" style="margin-top:14px">Terminar a las ${fmtTime(last + 120000)}</button>` : ''}
+    <button class="big ${dn ? '' : 'pri'}" data-a="staleGo" style="margin-top:10px">Sigo entrenando</button>
+    <button class="big ghost danger" data-a="staleDrop" style="margin-top:10px">Descartar entrenamiento</button>
+    <p class="mu sm" style="margin-top:12px">Si seguís, no cuento el tiempo sin actividad en la duración.</p>`);
+}
+// Duración estimada de un entrenamiento guardado que quedó abierto: tus sesiones de ese mismo día, o ~3 min por serie
+function estSessMs(s) {
+  const last = Math.max(0, ...s.exercises.flatMap(e => e.sets.map(x => x.t || 0)));
+  if (last > s.start) return last - s.start + 120000;
+  const ok = S.sessions.filter(x => x.id !== s.id && x.end - x.start > 10 * 60000 && x.end - x.start < 3 * 3600000);
+  const same = ok.filter(x => s.routineId && x.routineId === s.routineId), pool = same.length ? same : ok;
+  if (pool.length >= 2) { const d = pool.map(x => x.end - x.start).sort((a, b) => a - b); return d[Math.floor(d.length / 2)]; }
+  return Math.max(20, sessSets(s) * 3 + 10) * 60000;
+}
+
+function finishSession(endAt, quiet) {
   const a = S.active, st0 = streakInfo().n;
   const exs = a.exercises.map(e => ({
     exerciseId: e.exerciseId, name: e.name, muscle: e.muscle, unilateral: e.unilateral,
-    sets: e.sets.filter(s => s.done).map(s => { const o = { w: num(s.w), r: Math.round(num(s.r)) }; if (s.pr) o.pr = true; if (s.rir != null) o.rir = s.rir; return o; })
+    sets: e.sets.filter(s => s.done).map(s => { const o = { w: num(s.w), r: Math.round(num(s.r)) }; if (s.pr) o.pr = true; if (s.rir != null) o.rir = s.rir; if (s.ts) o.t = s.ts; return o; })
       .filter(s => Number.isFinite(s.w) && Number.isFinite(s.r) && s.r > 0)
   })).filter(e => e.sets.length);
-  const sess = { id: a.id, routineId: a.routineId, name: a.name, start: a.start, end: a.paused || Date.now(), exercises: exs };
+  const sess = { id: a.id, routineId: a.routineId, name: a.name, start: a.start, end: Math.max(a.start + 60000, endAt || realEnd(a)), exercises: exs };
   if (a.wk) sess.phase = `${a.wk.ph} · semana ${a.wk.w}`;
   S.sessions.push(sess); S.sessions.sort((x, y) => x.start - y.start);
   S.active = null; save();
+  if (quiet) { if (R.view === 'workout') go('home'); else render(); return; }
   fresh = sess.id; R.view = 'home'; go('session', sess.id); setTimeout(() => confetti(), 250); checkStreakUp(st0);
 }
 
@@ -3239,6 +3275,9 @@ function vSession() {
     ${isFresh ? '' : `<h1 style="margin-top:6px">${esc(s.name)}</h1>`}
     <div class="tiles" style="margin-top:16px"><div class="tile"><b>${fmtDur(s.end - s.start)}</b><span>Duración</span></div>
     <div class="tile"><b>${sessSets(s)}</b><span>Series</span></div><div class="tile"><b>${fmtBig(sessVol(s))}</b><span>Volumen (${unit()})</span></div></div>`;
+ if (s.end - s.start > 4 * 3600000) h += `<div class="card" style="margin-top:12px;border:1px solid rgba(255,179,71,.35)"><div class="row" style="gap:12px;align-items:flex-start">${ico('clock', 'orange')}<div class="sp"><div class="t" style="font-size:16px">¿Quedó abierto?</div>
+    <div class="mu sm" style="margin-top:2px">Figura que duró ${fmtDur(s.end - s.start)}. Seguramente te olvidaste de terminarlo.</div></div></div>
+    <button class="big pri" style="margin-top:12px" data-a="fixDur" data-id="${s.id}">Corregir a ${fmtDur(estSessMs(s))}</button><div class="mu sm" style="margin-top:8px">${s.exercises.some(e => e.sets.some(x => x.t)) ? 'Calculado con la hora de tu última serie.' : 'Estimado con lo que duran tus otros entrenamientos de este día.'} También podés poner los minutos a mano en Editar.</div></div>`;
   if (isFresh) h += `<button class="pri big cta glowpulse" style="margin-top:12px" data-a="share" data-id="${s.id}"><span class="row" style="justify-content:center;gap:10px">${SHARE_ICO}Compartir mi entrenamiento</span></button>`;
   if (prs || (prev && dv)) h += `<div class="card row" style="margin-top:8px;justify-content:center;gap:16px;flex-wrap:wrap">
     ${prs ? `<span class="badge gold" style="font-size:13px">🏆 ${prs} ${prs === 1 ? 'récord' : 'récords'}</span>` : ''}
@@ -3373,7 +3412,7 @@ function ask(title, text, okLabel, cb, danger) {
     <button class="big ${danger ? 'dangerbtn' : 'pri'}" data-a="confirmOk">${esc(okLabel)}</button><button class="big ghost" data-a="closeModal">Cancelar</button>`);
 }
 let toastT = 0;
-function toast(msg, gold) { const t = $('#toast'); t.textContent = msg; t.classList.toggle('gold', !!gold); t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2400); }
+function toast(msg, gold, ms = 2400) { const t = $('#toast'); t.textContent = msg; t.classList.toggle('gold', !!gold); t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms); }
 
 function openPicker(cb) { pickCb = cb; pickQ = ''; openModal(pickerHtml()); }
 function pickerHtml() {
@@ -4033,9 +4072,14 @@ const A = {
     let dn = 0, pend = 0;
     a.exercises.forEach(e => e.sets.forEach(s => s.done ? dn++ : (!e.skipped && pend++)));
     if (!dn) { ask('Sin series registradas', 'No completaste ninguna serie. ¿Querés descartar este entrenamiento?', 'Descartar', () => { S.active = null; save(); go('home'); }, true); return; }
-    ask('Terminar entrenamiento', `${dn} series completadas.${pend ? ` Las ${pend} pendientes no se guardarán.` : ''}`, 'Terminar y guardar', finishSession);
+    const re = realEnd(a), late = (a.paused || Date.now()) - re > 60000;
+    ask('Terminar entrenamiento', `${dn} series completadas.${pend ? ` Las ${pend} pendientes no se guardarán.` : ''}${late ? ` Como hubo mucho tiempo sin actividad, lo cierro a las ${fmtTime(re)}, después de tu última serie.` : ''}`, 'Terminar y guardar', () => finishSession());
   },
   finishNow: () => finishSession(),
+  staleEnd: () => { const a = S.active; closeModal(); if (!a) return; finishSession(lastActOf(a) + 120000); },
+  staleGo: () => { const a = S.active; closeModal(); if (!a) return; const gap = Date.now() - lastActOf(a) - 120000; if (gap > 0) { if (a.paused) { a.start += Date.now() - a.paused; a.paused = 0; } else a.start += gap; } a.lastAct = Date.now(); save(); go('workout'); },
+  staleDrop: () => { closeModal(); ask('Descartar entrenamiento', 'Se borran todas las series de esta sesión. No se puede deshacer.', 'Descartar', () => { S.active = null; save(); go('home'); }, true); },
+  fixDur: d => { const s = S.sessions.find(x => x.id === d.id); if (!s) return; s.end = s.start + estSessMs(s); s.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(`Duración corregida: ${fmtDur(s.end - s.start)}`); },
   restAdj: d => { const a = S.active; a.restEnd = Math.max(Date.now() + 1000, a.restEnd + (+d.d) * 1000); a.restTotal = Math.max(1, (a.restTotal || 120) + (+d.d)); save(); renderRest(); },
   restSkip: () => { S.active.restEnd = 0; save(); renderRest(); },
 
@@ -4077,6 +4121,7 @@ document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]');
   if (!el || el.disabled) return;
   const fn = A[el.dataset.a];
+  if (S.active && R.view === 'workout' && !/^stale/.test(el.dataset.a)) S.active.lastAct = Date.now();
   if (fn) { e.preventDefault(); fn(el.dataset, el); }
 });
 
@@ -4149,11 +4194,12 @@ async function checkNewVersion() {
     if (m && m[1] !== VERSION) { updPending = true; if (!['workout', 'edit', 'log'].includes(R.view)) location.reload(); }
   } catch (e) {}
 }
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNewVersion(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkNewVersion(); setTimeout(checkStale, 300); } });
 measureSat();
 render();
 setTimeout(() => { measureSat(); navScroll(); }, 400);
 if (AUTH) syncNow();
+setTimeout(checkStale, 900);
 window.addEventListener('scroll', navScroll, { passive: true });
 setTimeout(() => { const sp = $('#splash'); if (!sp) return; sp.classList.add('out'); setTimeout(() => sp.remove(), 600); }, 450);
 </script>
