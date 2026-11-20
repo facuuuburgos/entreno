@@ -575,6 +575,9 @@ b.warn{color:#ffb347}
 .wkname{font-weight:600;font-size:15px;line-height:1.3}.wkmeta{font-size:12.5px;margin-top:2px;line-height:1.35}
 .wkrx{font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}.wkrx span{color:var(--mu);font-weight:500;margin:0 2px}
 .wkrow.ssa,.wkrow.ssb{box-shadow:inset 3px 0 0 var(--ac);padding-left:8px;margin-left:-8px}.wkrow.ssb{border-top-color:transparent}
+.clrow{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--ln)}.clrow:first-child{border-top:0}
+.clt{width:48px;flex-shrink:0;font-weight:700;font-variant-numeric:tabular-nums}.cldot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.clrow.past{opacity:.38}.clrow.nx .clt{color:var(--ac)}.cltag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--acd);color:var(--ac)}
 .edc{display:flex;gap:10px;align-items:center;padding:12px 16px;margin-bottom:8px}.edc+.sslink,.edo+.sslink{margin-top:-2px}.edchev{font-size:20px;display:inline-block;transition:transform .2s}.edchev.on{transform:rotate(90deg)}
 </style>
 </head>
@@ -596,7 +599,7 @@ b.warn{color:#ffb347}
 
 <script>
 'use strict';
-const KEY = 'entreno.v1', VERSION = '8.8';
+const KEY = 'entreno.v1', VERSION = '8.9';
 const $ = s => document.querySelector(s);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2114,7 +2117,7 @@ window.addEventListener('resize', () => { measureSat(); navScroll(); });
 window.addEventListener('orientationchange', () => setTimeout(measureSat, 300));
 function render() {
   try { seedBio(); } catch (e) {}
-  const views = { program: vProgram, week: vWeek, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, maxes: vMaxes, compare: vCompare, analysis: vAnalysis, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout };
+  const views = { program: vProgram, week: vWeek, phase: vPhase, streak: vStreak, consistency: vConsistency, welcome: vWelcome, profile: vProfile, exercises: vExercises, log: vLog, home: vHome, train: vTrain, edit: vEdit, progress: vProgress, exercise: vExercise, coach: vCoach, maxes: vMaxes, compare: vCompare, analysis: vAnalysis, muscles: vMuscles, muscle: vMuscle, body: vBody, history: vHistory, session: vSession, settings: vSettings, workout: vWorkout, classes: vClasses };
   const app = $('#app');
   app.innerHTML = (views[R.view] || vHome)();
   buildNav(app);
@@ -2129,7 +2132,7 @@ function render() {
   } else lastCur = null;
   if (bumpF) { const el = document.querySelector(`[data-f="${bumpF}"]`); if (el) el.classList.add('bump'); bumpF = null; }
   justDone = null;
-  const tabOf = { week: 'train', session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', analysis: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', program: 'train', phase: 'train' };
+  const tabOf = { week: 'train', session: 'history', exercise: 'progress', coach: 'progress', maxes: 'progress', compare: 'progress', analysis: 'progress', muscles: 'progress', muscle: 'progress', body: 'progress', edit: 'train', log: 'history', profile: 'settings', exercises: 'train', consistency: 'home', streak: 'home', classes: 'home', program: 'train', phase: 'train' };
   const tabView = tabOf[R.view] || R.view;
   $('#tabs').style.display = ['workout', 'edit', 'log', 'welcome'].includes(R.view) ? 'none' : 'flex';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === tabView));
@@ -2259,6 +2262,42 @@ function heatmap(W = 18) {
   const cols = `grid-template-columns:repeat(${W},${W > 20 ? '12px' : '1fr'})`;
   return `<div class="hm"><div class="hm-m" style="${cols}">${months}</div><div class="hm-g" style="${cols}">${cells}</div></div>`;
 }
+/* ---------- Clases del gimnasio (Smart Fit Ciudad de la Costa) ---------- */
+// Grilla tomada de smartfit.com.uy el 20/11/2026. Para actualizarla, cambiar solo estas listas.
+const GYM = { name: 'Smart Fit Ciudad de la Costa', hours: 'Lun a Vie 6–23 h · Sáb 9–17 h · Dom y feriados 9–15 h', updated: '20/11/2026' };
+const CL_COL = { 'Estiramientos': '#6fcf97', 'Fit Dance': '#f2994a', 'Abdominales': '#56ccf2', 'Smart Cross': '#ff6b6b', 'GAP': '#bb6bd9' };
+const CL_A = [['07:00', 'Estiramientos', 30], ['07:30', 'Fit Dance', 45], ['08:15', 'Abdominales', 30], ['08:45', 'Smart Cross', 30], ['17:30', 'Abdominales', 30], ['18:00', 'Estiramientos', 30], ['18:30', 'Fit Dance', 45], ['19:15', 'Smart Cross', 30]];
+const CL_B = [['07:00', 'Abdominales', 30], ['07:30', 'Smart Cross', 30], ['08:15', 'GAP', 30], ['08:45', 'Estiramientos', 30], ['17:30', 'GAP', 30], ['18:00', 'Estiramientos', 30], ['18:30', 'Abdominales', 30], ['19:15', 'Smart Cross', 30]];
+const CL_WEEK = [CL_A, CL_B, CL_A, CL_B, CL_A, [], []]; // lunes a domingo
+const CL_DN = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'], CL_DL = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+let clDay = null;
+const clToday = () => (new Date().getDay() + 6) % 7;
+const clMin = t => { const [h, m] = t.split(':'); return +h * 60 + +m; };
+const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
+function clState(c, isToday) { if (!isToday) return ''; const a = clMin(c[0]), n = nowMin(); return n >= a + c[2] ? 'past' : n >= a ? 'now' : ''; }
+function clRow(c, st, nx) {
+  return `<div class="clrow ${st} ${nx ? 'nx' : ''}"><span class="clt">${c[0]}</span><span class="cldot" style="background:${CL_COL[c[1]] || 'var(--mu)'}"></span><span class="sp" style="font-weight:600">${esc(c[1])}</span>${st === 'now' ? '<span class="cltag">Ahora</span>' : nx ? '<span class="cltag">Próxima</span>' : ''}<span class="mu sm">${c[2]} min</span></div>`;
+}
+function clNext() { const T = clToday(), n = nowMin(); return CL_WEEK[T].find(c => clMin(c[0]) + c[2] > n) || null; }
+function classesCard() {
+  if (S.settings.gymClasses === false) return '';
+  const T = clToday(), L = CL_WEEK[T], n = nowMin(), up = L.filter(c => clMin(c[0]) + c[2] > n).slice(0, 2);
+  const body = !L.length ? 'Hoy no hay clases. Vuelven el lunes.'
+    : !up.length ? 'Ya terminaron las clases de hoy.'
+    : up.map(c => `<b style="color:var(--tx)">${c[0]}</b> ${esc(c[1])}${clMin(c[0]) <= n ? ' (ahora)' : ''}`).join(' · ');
+  return `<h2>Clases del gimnasio</h2><div class="card clickable" data-a="tab" data-v="classes"><div class="row">${ico('list')}<div class="sp">
+    <div class="t" style="font-size:16px">${up.length ? (up.length > 1 ? 'Próximas clases de hoy' : 'Próxima clase de hoy') : 'Clases grupales'}</div><div class="mu sm">${body}</div></div><span class="mu">›</span></div></div>`;
+}
+function vClasses() {
+  const T = clToday(); if (clDay == null) clDay = T;
+  const L = CL_WEEK[clDay], isT = clDay === T, nx = isT ? clNext() : null;
+  const tabs = `<div class="seg">${CL_DN.map((d, i) => `<button class="${i === clDay ? 'on' : ''}" data-a="clDay" data-i="${i}"${i === T && i !== clDay ? ' style="color:var(--ac)"' : ''}>${d}</button>`).join('')}</div>`;
+  const blk = (t, arr) => arr.length ? `<div class="kicker" style="margin:16px 0 8px">${t}</div><div class="card" style="padding:4px 18px">${arr.map(c => { const st = clState(c, isT); return clRow(c, st, c === nx && st !== 'now'); }).join('')}</div>` : '';
+  const body = L.length ? blk('Mañana', L.filter(c => clMin(c[0]) < 720)) + blk('Tarde', L.filter(c => clMin(c[0]) >= 720)) : `<div class="card mu c" style="padding:28px 18px">No hay clases ${isT ? 'hoy' : 'este día'}</div>`;
+  return `<div class="head"><button class="ghost" data-a="back">‹ Volver</button></div><div class="kicker">${esc(GYM.name)}</div><h1 style="margin-top:6px">Clases grupales</h1>
+    ${tabs}<div class="mu sm" style="margin-top:2px">${CL_DL[clDay]}${isT ? ' · hoy' : ''}</div>${body}
+    <p class="mu sm c" style="margin-top:18px">Horario del gimnasio: ${GYM.hours}<br>Grilla del ${GYM.updated}; puede cambiar, confirmala en la app de Smart Fit.</p>`;
+}
 function vHome() {
   const P = plan(), goal = weeklyGoal(), streak = calcStreak(goal);
   let h = `<div class="row" style="align-items:flex-start"><div class="sp"><div class="kicker">${cap(fmtDate(Date.now()))}</div><h1>${greet()}</h1></div><div class="row" style="gap:8px;margin-top:4px">${streakPill()}${avatar()}</div></div>`;
@@ -2321,6 +2360,7 @@ function vHome() {
       <div class="plan" style="grid-template-columns:repeat(${P.act.length},1fr)">${steps}</div></div>`;
   }
 
+  h += classesCard();
   if (S.sessions.length) {
     const st = strengthSum(), c = progCtx(), ph = c ? c.ph : null, w = c ? c.wEff : 1, K = {};
     P.act.forEach(r => r.items.forEach(it => { const k = coach(it.exerciseId, prescribe(it, ph, w)).kind; K[k] = (K[k] || 0) + 1; }));
@@ -3316,6 +3356,7 @@ function vSettings() {
     <label class="f"><span>Cuánto suman los botones − / + de peso</span><select data-f="step">${STEPS.map(v => `<option value="${v}" ${v == S.settings.step ? 'selected' : ''}>${fmtNum(v)} ${unit()}</option>`).join('')}</select></label>
     <label class="f"><span>Peso de la barra (para calcular los discos)</span><select data-f="bar">${[10, 15, 20].map(v => `<option value="${v}" ${v == S.settings.bar ? 'selected' : ''}>${v} kg</option>`).join('')}</select></label>
     <button class="toggle ${S.settings.photos === false ? '' : 'on'}" data-a="togPhotos" style="margin-top:4px"><span class="sp"><b>Fotos de los ejercicios</b><br><span class="mu sm">Inicio y final del movimiento en cada ficha</span></span><span class="sw"><i></i></span></button>
+    <button class="toggle ${S.settings.gymClasses === false ? '' : 'on'}" data-a="togGym" style="margin-top:4px"><span class="sp"><b>Clases del gimnasio en Inicio</b><br><span class="mu sm">Próximas clases de Smart Fit Ciudad de la Costa</span></span><span class="sw"><i></i></span></button>
     <label class="f" style="margin-bottom:0"><span>Descanso por defecto para ejercicios nuevos</span><select data-f="drest">${RESTS.map(v => `<option value="${v}" ${v == S.settings.rest ? 'selected' : ''}>${fmtRest(v)}</option>`).join('')}</select></label>
   </div>
   <h2>Respaldo</h2><div class="card">
@@ -3547,6 +3588,8 @@ const A = {
       <button class="big ghost" data-a="closeModal">Cancelar</button>`);
   },
   eeUni: (d, el) => el.classList.toggle('on'),
+  clDay: d => { clDay = +d.i; render(); },
+  togGym: (d, el) => { S.settings.gymClasses = S.settings.gymClasses === false; S.settings.u = Date.now(); el.classList.toggle('on', S.settings.gymClasses); save(); },
   togPhotos: (d, el) => { S.settings.photos = S.settings.photos === false; S.settings.u = Date.now(); el.classList.toggle('on', S.settings.photos); save(); },
   eeMus: d => { const w = eeMM[d.k] || 0, nw = w >= 1 ? .5 : w ? 0 : 1; if (nw) eeMM[d.k] = nw; else delete eeMM[d.k]; $('#ee_mm').innerHTML = eeChips(); },
   exFav: d => { const e = exById(d.id); if (!e) return; e.fav = !e.fav; e.u = Date.now(); save(); const y = window.scrollY; render(); window.scrollTo(0, y); toast(e.fav ? 'Agregado a favoritos ★' : 'Quitado de favoritos'); },
